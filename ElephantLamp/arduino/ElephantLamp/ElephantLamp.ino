@@ -8,6 +8,9 @@
 // TIMER
 Timer timer;
 
+// POWER
+boolean isOn = true;
+
 // -------
 // MICROPHONE: reads mic level, compares against average. once loud enough sounds
 // detected - it waits a certain amount (eg. 15 seconds) of time before resetting.
@@ -21,30 +24,40 @@ int soundResetCount = 0;
 int soundResetTimeLimit = 30; 
 boolean soundChanged = false;
 boolean fadeOnSound = false;
-boolean useMic = true;
+boolean useMic = false;
 int soundLevel = 0; // mic level
 float soundRange = 700.0f; // mic sensor range: 0 (min) - 700 (max)
 
 // -------
 // SPEAKER: plays white noise or ?
 int SPEAKER_PIN = 9;
-int noiseFrequencyDelay = 50;
+int noiseFrequencyDelay = 50; // not used?
 boolean useSpeaker = true;
 
-// -------
+/*
+fucked the leds...
+light 1 has no blue,
+light 2,3 ok
+light 4 has no blue or green
+*/
+
+// -------ch
 // RGB LEDS: fades/lerps between colours. led's are daisy chained. they change automatically
 // if mode = 0 (eg. every 5 seconds), or can be changed manually via osc (1) or sound detection (2).
 int CKI = 2; // clock pin
 int SDI = 3; // serial data pin
 uint32_t currentHex = 0xff0000;
 uint32_t newHex = 0xffff00;
-Color currentRGB = {255,0,0};
-Color newRGB = {255,255,0};
-int brightness = 50;//255;
-int hue = 255;
+//Color currentRGB = {0,0,255}; // from color
+//Color newRGB = {255,255,0}; // to color
+int lightCount = 4; // Number of RGBLED modules connected
+Color currentLedRGB[] = { {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0} };
+Color newLedRGB[] = { {0,255,0}, {255,127,0}, {255,255,0}, {255,0,0} };
+int hues[] = {0,0,0,0}; // custom per led
+int brightness = 255;
+int saturation = 255;
 float lerpInc = 0.0025;//025;//5;
 float lerpAmount = 0;
-int lightCount = 4; // Number of RGBLED modules connected
 int delayTime=5000;
 long previousMillis = 0;
 boolean changeColor = false;
@@ -71,12 +84,16 @@ void setup() {
    server.begin(serverPort); //ardosc
    
    // set callback functions for osc
-   server.addCallback("/tg/slider/hue",&onHue);
-   server.addCallback("/tg/slider/brightness",&onBrightness);
-   server.addCallback("/tg/dropdown/mode",&onMode);
-   server.addCallback("/tg/dropdown/lightcount",&onLightCount);
-   server.addCallback("/tg/toggle/microphone",&onMicrophone);
-   server.addCallback("/tg/slider/noisefrequency",&onNoiseFreq);
+   server.addCallback("/hueAll",&onHueAll);
+   server.addCallback("/hue1",&onHue1);
+   server.addCallback("/hue2",&onHue2);
+   server.addCallback("/hue3",&onHue3);
+   server.addCallback("/hue4",&onHue4);
+   server.addCallback("/brightness",&onBrightness);
+   server.addCallback("/saturation",&onSaturation);
+   server.addCallback("/mode",&onMode);
+   server.addCallback("/microphone",&onMicrophone);
+   //server.addCallback("/noisefrequency",&onNoiseFreq);
    
    // print arduino local IP address:
    Serial.print("My IP address: ");
@@ -92,11 +109,13 @@ void setup() {
   pinMode(SPEAKER_PIN, OUTPUT); // speaker pin
 
   // timers
-  timer.every(20, checkModes); 
-  timer.every(.05, checkSpeaker); // speaker needs seperate loop
+  timer.every(20, onTimerUpdate); // normal update loop
+  timer.every(.05, onTimerSpeaker); // speaker needs seperate loop
 }
 
 void loop() {
+  if(!isOn) return;
+  
   // using timers instead of normal loop
   timer.update();
 
@@ -118,7 +137,7 @@ void loop() {
   //delay(10);
 }
 
-void checkModes() {
+void onTimerUpdate() {
 
   if(mode == 0) {
     // automatic mode change colours based on a timer
@@ -129,14 +148,15 @@ void checkModes() {
   } 
   else if(mode == 2) {
     // change lights based on sound input
-    checkMic();
+    updateMic();
   }
 
-  checkLeds();
+  //checkLeds();
+  updateLeds();
 }
 
 // ------- MIC
-void checkMic() {
+void updateMic() {
 
   if(useMic) {
 
@@ -168,8 +188,11 @@ void checkMic() {
       if(diff > differenceScale) {
         soundChanged = true;
         lerpAmount = 0;
-        hue = random(0,255);
-        ColorUtils::setHsb(newRGB, hue, 255, brightness);
+        //ColorUtils::setHsb(newRGB, hue, 255, brightness);
+        for(int i = 0; i < lightCount; i++)  {
+          hues[i] = random(0,255);
+          ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+        }
       }
     } 
     else {
@@ -195,7 +218,7 @@ int getRollingAverage(int v) {
 
 
 // ------- SPEAKER
-void checkSpeaker() {
+void onTimerSpeaker() {
   if(useSpeaker) generateNoise();
 }
 
@@ -218,7 +241,161 @@ void generateNoise(){
 
 // ------- RGB LEDS
 long mask; //
-void checkLeds() {
+// update individual leds
+void updateLeds() {
+  
+  if(lerpAmount < 1) lerpAmount += lerpInc;
+  
+  for(int i = 0; i < lightCount; i++)  {
+    
+    ColorUtils::lerpRGB(currentLedRGB[i], newLedRGB[i], lerpAmount);
+    uint32_t hexForLed =  ColorUtils::rgbToHex(currentLedRGB[i].r,currentLedRGB[i].g,currentLedRGB[i].b);
+  
+    for(byte color_bit = 23 ; color_bit != 255 ; color_bit--) {
+      //Feed color bit 23 first (red data MSB)
+      digitalWrite(CKI, LOW); //Only change data when clock is low
+      mask = 1L << color_bit;
+      //The 1'L' forces the 1 to start as a 32 bit number, otherwise it defaults to 16-bit.
+      if(hexForLed & mask) {
+        digitalWrite(SDI, HIGH);
+      } 
+      else {
+        digitalWrite(SDI, LOW);
+      }
+
+      digitalWrite(CKI, HIGH); //Data is latched when clock goes high
+    }
+  }
+
+  //Pull clock low to put strip into reset/post mode
+  digitalWrite(CKI, LOW);
+}
+
+unsigned long currentMillis;
+void autoRandomiseColor() {
+  currentMillis = millis();
+  if(currentMillis - previousMillis > delayTime) {
+    previousMillis = currentMillis;   
+    lerpAmount = 0;    
+    //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
+    for(int i = 0; i < lightCount; i++)  {
+      hues[i] = random(0,255);
+      ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+    }
+  } 
+}
+
+
+// ------- OSC events
+void onHue1(OSCMessage *_mes){
+  hues[0] = _mes->getArgInt32(0);
+  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
+  ColorUtils::setHsb(newLedRGB[0], hues[0], saturation, brightness);
+  Serial.println("hue1 changed: ");
+  Serial.print(hues[0]);
+}
+
+void onHue2(OSCMessage *_mes){
+  hues[1] = _mes->getArgInt32(0);
+  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
+  ColorUtils::setHsb(newLedRGB[1], hues[1], saturation, brightness);
+  Serial.println("hue2 changed: ");
+  Serial.print(hues[1]);
+}
+
+void onHue3(OSCMessage *_mes){
+  hues[2] = _mes->getArgInt32(0);
+  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
+  ColorUtils::setHsb(newLedRGB[2], hues[2], saturation, brightness);
+  Serial.println("hue3 changed: ");
+  Serial.print(hues[2]);
+}
+
+void onHue4(OSCMessage *_mes){
+  hues[3] = _mes->getArgInt32(0);
+  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
+  ColorUtils::setHsb(newLedRGB[3], hues[3], saturation, brightness);
+  Serial.println("hue4 changed: ");
+  Serial.print(hues[3]);
+}
+
+void onHueAll(OSCMessage *_mes){
+  int hue = _mes->getArgInt32(0);
+  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
+  for(int i = 0; i < lightCount; i++)  {
+    hues[i] = hue;
+    ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+  }
+  Serial.println("hue changed: ");
+  Serial.print(hue);
+}
+
+void onBrightness(OSCMessage *_mes){
+  brightness = _mes->getArgInt32(0);
+  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
+  for(int i = 0; i < lightCount; i++)  {
+    ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+  }
+  Serial.println("brightness changed: ");
+  Serial.print(brightness);
+}
+
+void onSaturation(OSCMessage *_mes){
+  saturation = _mes->getArgInt32(0);
+  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
+  for(int i = 0; i < lightCount; i++)  {
+    ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+  }
+  Serial.println("saturation changed: ");
+  Serial.print(saturation);
+}
+
+void onMode(OSCMessage *_mes){
+  mode = _mes->getArgInt32(0);
+  Serial.println("mode changed: ");
+  Serial.print(mode);
+}
+
+void onMicrophone(OSCMessage *_mes){
+  useMic = _mes->getArgInt32(0);
+  Serial.println("microphone changed: ");
+  Serial.print(useMic);
+}
+
+void onPower(OSCMessage *_mes){
+  isOn = (_mes->getArgInt32(0) == 1) ? true : false;
+  for(int i = 0; i < lightCount; i++)  {
+    if(!isOn) {
+      // switch all lights off- to black
+      saturation = 0;
+      brightness = 0;
+      hues[i] = 0;
+      ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+      ColorUtils::setHsb(currentLedRGB[i], hues[i], saturation, brightness);
+    } else {
+      // switch all lights on- to white
+      hues[i] = 255;
+      saturation = 255;
+      brightness = 255;
+      ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+    }
+    
+  }
+  Serial.println("power changed: ");
+  Serial.print(isOn);
+}
+
+/*void onNoiseFreq(OSCMessage *_mes) {
+  noiseFrequencyDelay = _mes->getArgInt32(0);
+  Serial.println("noise freq changed: ");
+  Serial.print(noiseFrequencyDelay);
+}*/
+
+
+
+
+// old method for updateing all leds to same color
+/*void checkLeds() {
 
   // rgb lerp
   if(lerpAmount < 1) lerpAmount += lerpInc;
@@ -226,8 +403,7 @@ void checkLeds() {
   uint32_t hexForLed =  ColorUtils::rgbToHex(currentRGB.r,currentRGB.g,currentRGB.b);
 
   // light up led
-  for(int i = 0; i < lightCount; i++)
-  {
+  for(int i = 0; i < lightCount; i++)  {
     for(byte color_bit = 23 ; color_bit != 255 ; color_bit--) {
       //Feed color bit 23 first (red data MSB)
       digitalWrite(CKI, LOW); //Only change data when clock is low
@@ -247,59 +423,6 @@ void checkLeds() {
   //Pull clock low to put strip into reset/post mode
   digitalWrite(CKI, LOW);
   //delayMicroseconds(500); //Wait for 500us to go into reset
-}
-
-
-unsigned long currentMillis;
-void autoRandomiseColor() {
-  currentMillis = millis();
-  if(currentMillis - previousMillis > delayTime) {
-    previousMillis = currentMillis;   
-    lerpAmount = 0;
-    hue = random(0,255);
-    ColorUtils::setHsb(newRGB, hue, 255, brightness);
-  } 
-}
-
-
-// ------- OSC events
-void onHue(OSCMessage *_mes){
-  hue = _mes->getArgInt32(0);
-  ColorUtils::setHsb(newRGB, hue, 255, brightness);
-  Serial.println("hue changed: ");
-  Serial.print(hue);
-}
-
-void onBrightness(OSCMessage *_mes){
-  brightness = _mes->getArgInt32(0);
-  ColorUtils::setHsb(newRGB, hue, 255, brightness);
-  Serial.println("brightness changed: ");
-  Serial.print(brightness);
-}
-
-void onMode(OSCMessage *_mes){
-  mode = _mes->getArgInt32(0);
-  Serial.println("mode changed: ");
-  Serial.print(mode);
-}
-
-void onLightCount(OSCMessage *_mes){
-  lightCount = _mes->getArgInt32(0) + 1;
-  Serial.println("light count changed: ");
-  Serial.print(lightCount);
-}
-
-void onMicrophone(OSCMessage *_mes){
-  useMic = _mes->getArgInt32(0);
-  Serial.println("microphone changed: ");
-  Serial.print(useMic);
-}
-
-void onNoiseFreq(OSCMessage *_mes) {
-  noiseFrequencyDelay = _mes->getArgInt32(0);
-  Serial.println("noise freq changed: ");
-  Serial.print(noiseFrequencyDelay);
-}
-
+}*/
 
 
