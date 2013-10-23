@@ -1,0 +1,4 @@
+ofxMovieClip
+ofxOsc
+ofxTouchGUI
+ofxXmlSettings
