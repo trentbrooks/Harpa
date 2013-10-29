@@ -1,0 +1,75 @@
+<control>
+    <type>dropdown</type>
+    <label>EASING TYPES</label>
+    <value>23</value>
+</control>
+<control>
+    <type>slider</type>
+    <label>TWEEN DURATION</label>
+    <value>1.000000000</value>
+</control>
+<control>
+    <type>slider</type>
+    <label>TIMER LIMIT</label>
+    <value>10.000000000</value>
+</control>
+<control>
+    <type>slider</type>
+    <label>SMOOTH AMOUNT</label>
+    <value>0.899999976</value>
+</control>
+<control>
+    <type>slider</type>
+    <label>PREDICT AMOUNT</label>
+    <value>0.850000024</value>
+</control>
+<control>
+    <type>toggle</type>
+    <label>PAUSE TWEEN</label>
+    <value>0</value>
+</control>
+<control>
+    <type>slider</type>
+    <label>POLY SMOOTH SIZE</label>
+    <value>0</value>
+</control>
+<control>
+    <type>slider</type>
+    <label>ARC RESOLUTION</label>
+    <value>0</value>
+</control>
+<control>
+    <type>slider</type>
+    <label>ARC WIDTH</label>
+    <value>0</value>
+</control>
+<control>
+    <type>slider</type>
+    <label>ARC HEIGHT</label>
+    <value>0</value>
+</control>
+<control>
+    <type>slider</type>
+    <label>BAND THICKNESS</label>
+    <value>0.000000000</value>
+</control>
+<control>
+    <type>slider</type>
+    <label>STROKE WIDTH</label>
+    <value>0.000000000</value>
+</control>
+<control>
+    <type>slider</type>
+    <label>START ANGLE</label>
+    <value>0.000000000</value>
+</control>
+<control>
+    <type>slider</type>
+    <label>END ANGLE</label>
+    <value>0.000000000</value>
+</control>
+<control>
+    <type>toggle</type>
+    <label>USE CUSTOM ARC</label>
+    <value>0</value>
+</control>
