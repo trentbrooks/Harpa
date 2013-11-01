@@ -10,6 +10,7 @@
  - has an ofTexture, which uses ResourceManager to ensure images are only loaded once throughout the app- loadImage(string)
  - has automatic tweening for position, size, and rotation (todo).
  - top left aligned (0,0)
+ - dependencies: TweenUtils + ResourceManager
  
  What it is not...
  - a multitouch layer for dragging/moving, resizing, rotating.
@@ -64,10 +65,24 @@ public:
         touchEnabled = false;
     };
     
+    // TODO: operator overload and copy contructor
+    /*DisplayLayer& operator=(const DisplayLayer & mom){
+        // copy all mom properties
+        return *this;
+    };*/
+    
+    DisplayLayer(const DisplayLayer & mom){
+        // copy all mom properties except image stuff
+        *this = mom;
+        image = NULL;
+        hasImage = false;
+    }
+    
     ~DisplayLayer() {
         tween.resetAll();
         clearImage();
         layers.clear();
+        ofLog() << "CLEARING DSPLAI LAYER?";
     };
     
     virtual void setup() {};
@@ -77,10 +92,14 @@ public:
     // image loading + clearing
     void loadImage(string path) {
         clearImage();
-        image = ResourceManager::loadTexture(path);
+        image = ResourceManager::loadTexture(path); // or ofImage- ResourceManager::loadImage(path)
+        if(!image->isAllocated()) {
+            image->clear();
+            image = NULL;
+        }
         width = image->getWidth();
         height = image->getHeight();
-        hasImage = true;
+        hasImage = true;        
     };
     
     void clearImage() {
@@ -161,6 +180,16 @@ public:
     // must call onDown, onMoved, and onUp from testApp or parent layer from mouse or touch events
     // automatically updates layers. Dispatches the top most layer's events only, eg. child layer.
     
+    template <class ListenerClass>
+    void addEventListener(ListenerClass * listener){
+        ofAddListener(onButtonUpEvent,listener,&ListenerClass::onLayerUpEvent);
+    };
+    
+    template <class ListenerClass>
+    void removeEventListener(ListenerClass * listener){
+        ofRemoveListener(onButtonUpEvent,listener,&ListenerClass::onLayerUpEvent);
+    };
+    
     bool hitTest(float x, float y) {
         if(!isCentred) {
             return x > position.x && x < position.x + width && y > position.y && y < position.y + height;
@@ -219,7 +248,6 @@ public:
     ofTexture* getImage() {
         return image;
     };
-    
     
     void setId(int i) {
         layerId = i;
@@ -321,7 +349,7 @@ public:
         return tween;
     };
     
-    // registration point
+    // registration point - centered or top left
     void setCentreAligned(bool centred) {
         isCentred = centred;
     };

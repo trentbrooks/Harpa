@@ -28,30 +28,6 @@ typedef std::tr1::function<void(void)> CallbackFunction;
 
 
 //--------------------------------------------------------------
-// helper class for tweening.
-struct TweenSettings {
-    
-    // tween properties
-    float *tweenValue; // pointer to the value we want to tween
-    float elapsed; // t always changing- elapsed since startTime
-    float from; // b static
-    float to; // c static - when settings 'to' remember to subtract 'from' when passing to a TweenCurves function
-    float duration; // d static
-    float startTime; // when the tween begins
-    float delayStartTime, delayDuration; // delay before starting (same thing)
-    
-    // on finished callback
-    bool callbackAdded;
-    bool tweenComplete;
-	CallbackFunction callback; // void
-    
-    // easing function
-    EasingFunction easeFunc; // float
-};
-
-
-
-//--------------------------------------------------------------
 /*
  EasingCurves: Tween floats with easing curves.
  - All Penner's easing equations: http://robertpenner.com/easing/
@@ -245,7 +221,7 @@ public:
 
 
 //--------------------------------------------------------------
-// Static array pointing to all the functions in EasingCurves. Access with an EasingType index.
+// Static array/LUT pointing to all the functions in EasingCurves. Access with an EasingType index.
 static EasingFunction EasingFunctions[31] = {EasingCurves::LinearInterpolation, EasingCurves::QuadraticEaseIn, EasingCurves::QuadraticEaseOut, EasingCurves::QuadraticEaseInOut, EasingCurves::CubicEaseIn, EasingCurves::CubicEaseOut, EasingCurves::CubicEaseInOut, EasingCurves::QuarticEaseIn, EasingCurves::QuarticEaseOut, EasingCurves::QuarticEaseInOut, EasingCurves::QuinticEaseIn, EasingCurves::QuinticEaseOut, EasingCurves::QuinticEaseInOut, EasingCurves::SineEaseIn, EasingCurves::SineEaseOut, EasingCurves::SineEaseInOut, EasingCurves::ExponentialEaseIn, EasingCurves::ExponentialEaseOut, EasingCurves::ExponentialEaseInOut, EasingCurves::CircularEaseIn, EasingCurves::CircularEaseOut, EasingCurves::CircularEaseInOut, EasingCurves::BackEaseIn, EasingCurves::BackEaseOut, EasingCurves::BackEaseInOut, EasingCurves::ElasticEaseIn, EasingCurves::ElasticEaseOut, EasingCurves::ElasticEaseInOut, EasingCurves::BounceEaseIn, EasingCurves::BounceEaseOut, EasingCurves::BounceEaseInOut
 };
 
@@ -263,6 +239,29 @@ enum EasingType {
     BACK_IN, BACK_OUT, BACK_IN_OUT,
     ELASTIC_IN, ELASTIC_OUT, ELASTIC_IN_OUT,
     BOUNCE_IN, BOUNCE_OUT, BOUNCE_IN_OUT
+};
+
+
+//--------------------------------------------------------------
+// helper class for tweening.
+struct TweenSettings {
+    
+    // tween properties
+    float *tweenValue; // pointer to the value we want to tween
+    float elapsed; // t always changing- elapsed since startTime
+    float from; // b static
+    float to; // c static - when settings 'to' remember to subtract 'from' when passing to a TweenCurves function
+    float duration; // d static
+    float startTime; // when the tween begins
+    float delayStartTime, delayDuration; // delay before starting (same thing)
+    
+    // on finished callback
+    bool callbackAdded;
+    bool tweenComplete;
+	CallbackFunction callback; // void
+    
+    // easing function
+    EasingFunction easeFunc; // float
 };
 
 
@@ -354,6 +353,7 @@ public:
     
     void resetAll() {
         isReady = false;
+		isPaused = false;
     };
     
     void update() {
@@ -498,6 +498,7 @@ public:
         while(tweens.size()) {
             tweens.erase(tweens.begin());
         }
+		isPaused = false;
     };
     
     void update() {

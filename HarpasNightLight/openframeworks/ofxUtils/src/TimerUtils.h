@@ -104,6 +104,7 @@ public:
 
     void stop() {
         counting = false;
+		isPaused = false;
     };
 
     // get the current timer's time (1,2,3). Optional- get the reverse 'countdown' time (3,2,1).
@@ -225,6 +226,7 @@ public:
     void reset() {
         time = 0;
         callbackAdded = false;
+		isPaused = false;
         stop();
     };
     

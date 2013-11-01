@@ -33,31 +33,5 @@ public:
         return t;
     }
     
-    // creates a bunch of ofImages (pixels) and then crashes :)
-    // test the limits of how much RAM memory the app can handle (see console)
-    static void MemoryMaxOutAndCrash() {
-        int memoryCount = 100000;
-        vector<ofImage*> memoryList;
-        for(int i = 0; i < memoryCount; i++) {
-            try {
-                ofImage* img = new ofImage();
-                img->setUseTexture(false);
-                //img->loadImage("ui/screen-intro.png");
-                img->allocate(1920, 1080, OF_IMAGE_COLOR_ALPHA);
-                memoryList.push_back(img);
-            } catch(exception& e) {
-                ofLogError() << "Memory maxed out at " << i << " 1920x1080 ofImages. Error " << e.what();
-                /*for(int j = 0; j < memoryList.size(); j++) {
-                    memoryList[i]->clear();
-                    delete memoryList[i];
-                    memoryList[i] = NULL;
-                }
-                memoryList.clear();*/
-                ofExit();
-                break;
-            }
-        }
-    }
-
 };
 
