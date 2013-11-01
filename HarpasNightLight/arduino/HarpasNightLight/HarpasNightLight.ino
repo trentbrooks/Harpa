@@ -1,9 +1,20 @@
 
-#include "ColorUtils.h" // custom
-#include <SPI.h>
+// needs wifi or ethernet for external control
+//#define USE_WIFI // http://arduino.cc/en/Main/ArduinoWiFiShield
+#define USE_ETHERNET // http://arduino.cc/en/reference/ethernet
+
+#ifdef USE_ETHERNET
 #include <Ethernet.h> // version IDE 0022
+#elif USE_WIFI
+#include <WiFi.h>   
+#endif
+
+#include <SPI.h>
+#include "ColorUtils.h" // custom
 #include <ArdOSC.h> // https://github.com/recotana/ArdOSC
 #include <Timer.h> // https://github.com/JChristensen/Timer
+
+
 
 // TIMER
 Timer timer;
@@ -36,25 +47,44 @@ int8_t noiseTimerId;
 boolean useSpeaker = true;
 
 /*
-fucked the leds...
-light 1 has no blue,
-light 2,3 ok
-light 4 has no blue or green
-*/
+fucked the leds... need to buy more
+ light 1 has no blue,
+ light 2,3 ok
+ light 4 has no blue or green
+ */
 
 // -------ch
 // RGB LEDS: fades/lerps between colours. led's are daisy chained. they change automatically
 // if mode = 0 (eg. every 5 seconds), or can be changed manually via osc (1) or sound detection (2).
-int CKI = 2; // clock pin
-int SDI = 3; // serial data pin
+int LED_CLOCK_PIN = 2; // clock pin
+int LED_SERIAL_PIN = 3; // serial data pin
 uint32_t currentHex = 0xff0000;
 uint32_t newHex = 0xffff00;
 //Color currentRGB = {0,0,255}; // from color
 //Color newRGB = {255,255,0}; // to color
 int lightCount = 4; // Number of RGBLED modules connected
-Color currentLedRGB[] = { {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0} };
-Color newLedRGB[] = { {0,255,0}, {255,127,0}, {255,255,0}, {255,0,0} };
-int hues[] = {0,0,0,0}; // custom per led
+Color currentLedRGB[] = { 
+  {
+    0,0,0    }
+  , {
+    0,0,0    }
+  , {
+    0,0,0    }
+  , {
+    0,0,0    } 
+};
+Color newLedRGB[] = { 
+  {
+    0,255,0    }
+  , {
+    255,127,0    }
+  , {
+    255,255,0    }
+  , {
+    255,0,0    } 
+};
+int hues[] = {
+  0,0,0,0}; // custom per led
 int brightness = 255;
 int saturation = 255;
 float lerpInc = 0.0025;//025;//5;
@@ -70,9 +100,16 @@ byte myMac[] = {
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 byte myIp[]  = { 
   192, 168, 1, 9 }; // not required by arduino software, but good to know for phone/osc
-int  serverPort  = 4444;
+int serverPort  = 5556;
 OSCServer server;
 
+#ifdef USE_WIFI
+// Wifi WPA/WPA2 network credentials
+char ssid[] = "yourNetwork";     //  your network SSID (name) 
+char pass[] = "12345678";    // your network password
+int status = WL_IDLE_STATUS;     // the Wifi radio's status
+IPAddress ip;                    // the IP address of your shield
+#endif
 
 // ----------------------------------------------------------------------
 void setup() {
@@ -80,33 +117,57 @@ void setup() {
   // baud rate
   Serial.begin(38400); //19200
 
-    // osc/network
-  /*Ethernet.begin(myMac); // can also pass ip + mac address: (myMac ,myIp);
-   server.begin(serverPort); //ardosc
-   
-   // set callback functions for osc
-   server.addCallback("/hueAll",&onHueAll);
-   server.addCallback("/hue1",&onHue1);
-   server.addCallback("/hue2",&onHue2);
-   server.addCallback("/hue3",&onHue3);
-   server.addCallback("/hue4",&onHue4);
-   server.addCallback("/brightness",&onBrightness);
-   server.addCallback("/saturation",&onSaturation);
-   server.addCallback("/mode",&onMode);
-   server.addCallback("/microphone",&onMicrophone);
-   server.addCallback("/speaker",&onSpeaker);
-   server.addCallback("/noisefrequency",&onNoiseFreq);
-   
-   // print arduino local IP address:
-   Serial.print("My IP address: ");
-   for (byte thisByte = 0; thisByte < 4; thisByte++) {
-   Serial.print(Ethernet.localIP()[thisByte], DEC);
-   Serial.print("."); 
-   }*/
+   // network
+#ifdef USE_ETHERNET
+  Ethernet.begin(myMac); // using a default myMac address, can also pass ip + mac address: (myMac ,myIp);
+  // print arduino local IP address:
+  Serial.print("My IP address: ");
+  for (byte thisByte = 0; thisByte < 4; thisByte++) {
+    Serial.print(Ethernet.localIP()[thisByte], DEC);
+    Serial.print(".");
+  }
+#elif USE_WIFI
+  char firmwareVer[6];
+  WiFi.firmwareVersion(firmwareVer);
+  Serial.println("Wifi firmware version: ");
+  Serial.print(firmwareVer);
+  WiFi.macAddress(myMac); // populates myMac
+  // attempt to connect using WPA2 encryption:
+  Serial.println("Attempting to connect to WPA network...");
+  status = WiFi.begin(ssid, pass);
+
+  // if you're not connected, stop here:
+  if ( status != WL_CONNECTED) { 
+    Serial.println("Couldn't get a wifi connection");
+    while(true);
+  } 
+  else {
+    Serial.println("Connected to wifi network");
+    ip = WiFi.localIP();
+    Serial.println(ip);
+  }
+#endif
+
+  // osc
+  server.begin(serverPort); //ardosc
+
+  // set callback functions for osc
+  server.addCallback("/hueAll",&onHueAll);
+  server.addCallback("/hue1",&onHue1);
+  server.addCallback("/hue2",&onHue2);
+  server.addCallback("/hue3",&onHue3);
+  server.addCallback("/hue4",&onHue4);
+  server.addCallback("/brightness",&onBrightness);
+  server.addCallback("/saturation",&onSaturation);
+  server.addCallback("/mode",&onMode);
+  server.addCallback("/microphone",&onMicrophone);
+  server.addCallback("/speaker",&onSpeaker);
+  server.addCallback("/noisefrequency",&onNoiseFrequency);
+
 
   // inputs + outputs
-  pinMode(SDI, OUTPUT); // led serial pin
-  pinMode(CKI, OUTPUT); // led clock pin
+  pinMode(LED_SERIAL_PIN, OUTPUT); // led serial pin
+  pinMode(LED_CLOCK_PIN, OUTPUT); // led clock pin
   pinMode(SPL_PIN, INPUT); // mic pin
   pinMode(SPEAKER_PIN, OUTPUT); // speaker pin
 
@@ -117,7 +178,7 @@ void setup() {
 
 void loop() {
   if(!isOn) return;
-  
+
   // using timers instead of normal loop
   timer.update();
 
@@ -170,19 +231,19 @@ void updateMic() {
     // 1) sound either turns leds on/off (defined by fadeOnSound), then waits for delay before resetting
     // eg. if baby cries, then the lights go off - this would be a cruel way to train a baby not to cry. 
     /*if(!soundChanged) {
-       // check if current read is x amount greater than average
-       if(diff > differenceScale)  {       
-         soundChanged = true;
-         brightness = (fadeOnSound) ? 0 : 255;
-         setHsb(newRGB, hue, 255, brightness);
-       }
+     // check if current read is x amount greater than average
+     if(diff > differenceScale)  {       
+     soundChanged = true;
+     brightness = (fadeOnSound) ? 0 : 255;
+     setHsb(newRGB, hue, 255, brightness);
+     }
      } 
      else {
-       // reset after threshold
-       soundResetCount++;
-       if(soundResetCount > soundResetTimeLimit) {
-         soundChanged = false;
-       }
+     // reset after threshold
+     soundResetCount++;
+     if(soundResetCount > soundResetTimeLimit) {
+     soundChanged = false;
+     }
      }*/
 
     // 2) sound could change the colour of the leds instead of turning led on/off   
@@ -237,7 +298,7 @@ void generateNoise(){
   newr = (reg << 1) | lobit;
   reg = newr;
   digitalWrite (SPEAKER_PIN, reg & 1);
-  
+
   // use timer instead of below
   //delayMicroseconds (noiseFrequencyDelay); // Changing this value changes the frequency.
 } 
@@ -247,32 +308,32 @@ void generateNoise(){
 long mask; //
 // update individual leds
 void updateLeds() {
-  
+
   if(lerpAmount < 1) lerpAmount += lerpInc;
-  
+
   for(int i = 0; i < lightCount; i++)  {
-    
+
     ColorUtils::lerpRGB(currentLedRGB[i], newLedRGB[i], lerpAmount);
     uint32_t hexForLed =  ColorUtils::rgbToHex(currentLedRGB[i].r,currentLedRGB[i].g,currentLedRGB[i].b);
-  
+
     for(byte color_bit = 23 ; color_bit != 255 ; color_bit--) {
       //Feed color bit 23 first (red data MSB)
-      digitalWrite(CKI, LOW); //Only change data when clock is low
+      digitalWrite(LED_CLOCK_PIN, LOW); //Only change data when clock is low
       mask = 1L << color_bit;
       //The 1'L' forces the 1 to start as a 32 bit number, otherwise it defaults to 16-bit.
       if(hexForLed & mask) {
-        digitalWrite(SDI, HIGH);
+        digitalWrite(LED_SERIAL_PIN, HIGH);
       } 
       else {
-        digitalWrite(SDI, LOW);
+        digitalWrite(LED_SERIAL_PIN, LOW);
       }
 
-      digitalWrite(CKI, HIGH); //Data is latched when clock goes high
+      digitalWrite(LED_CLOCK_PIN, HIGH); //Data is latched when clock goes high
     }
   }
 
   //Pull clock low to put strip into reset/post mode
-  digitalWrite(CKI, LOW);
+  digitalWrite(LED_CLOCK_PIN, LOW);
 }
 
 unsigned long currentMillis;
@@ -392,14 +453,15 @@ void onPower(OSCMessage *_mes){
       hues[i] = 0;
       ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
       ColorUtils::setHsb(currentLedRGB[i], hues[i], saturation, brightness);
-    } else {
+    } 
+    else {
       // switch all lights on- to white
       hues[i] = 255;
       saturation = 255;
       brightness = 255;
       ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
     }
-    
+
   }
   Serial.println("power changed: ");
   Serial.print(isOn);
@@ -410,33 +472,35 @@ void onPower(OSCMessage *_mes){
 
 // old method for updateing all leds to same color
 /*void checkLeds() {
+ 
+ // rgb lerp
+ if(lerpAmount < 1) lerpAmount += lerpInc;
+ ColorUtils::lerpRGB(currentRGB, newRGB, lerpAmount);
+ uint32_t hexForLed =  ColorUtils::rgbToHex(currentRGB.r,currentRGB.g,currentRGB.b);
+ 
+ // light up led
+ for(int i = 0; i < lightCount; i++)  {
+ for(byte color_bit = 23 ; color_bit != 255 ; color_bit--) {
+ //Feed color bit 23 first (red data MSB)
+ digitalWrite(CKI, LOW); //Only change data when clock is low
+ mask = 1L << color_bit;
+ //The 1'L' forces the 1 to start as a 32 bit number, otherwise it defaults to 16-bit.
+ if(hexForLed & mask) {
+ digitalWrite(SDI, HIGH);
+ } 
+ else {
+ digitalWrite(SDI, LOW);
+ }
+ 
+ digitalWrite(CKI, HIGH); //Data is latched when clock goes high
+ }
+ }
+ 
+ //Pull clock low to put strip into reset/post mode
+ digitalWrite(CKI, LOW);
+ //delayMicroseconds(500); //Wait for 500us to go into reset
+ }*/
 
-  // rgb lerp
-  if(lerpAmount < 1) lerpAmount += lerpInc;
-  ColorUtils::lerpRGB(currentRGB, newRGB, lerpAmount);
-  uint32_t hexForLed =  ColorUtils::rgbToHex(currentRGB.r,currentRGB.g,currentRGB.b);
 
-  // light up led
-  for(int i = 0; i < lightCount; i++)  {
-    for(byte color_bit = 23 ; color_bit != 255 ; color_bit--) {
-      //Feed color bit 23 first (red data MSB)
-      digitalWrite(CKI, LOW); //Only change data when clock is low
-      mask = 1L << color_bit;
-      //The 1'L' forces the 1 to start as a 32 bit number, otherwise it defaults to 16-bit.
-      if(hexForLed & mask) {
-        digitalWrite(SDI, HIGH);
-      } 
-      else {
-        digitalWrite(SDI, LOW);
-      }
-
-      digitalWrite(CKI, HIGH); //Data is latched when clock goes high
-    }
-  }
-
-  //Pull clock low to put strip into reset/post mode
-  digitalWrite(CKI, LOW);
-  //delayMicroseconds(500); //Wait for 500us to go into reset
-}*/
 
 
