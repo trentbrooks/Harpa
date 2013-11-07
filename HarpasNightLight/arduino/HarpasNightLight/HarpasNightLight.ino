@@ -1,6 +1,6 @@
 
 #include <Ethernet.h> // http://arduino.cc/en/reference/ethernet
-//#include <EthernetBonjour.h>
+#include <EthernetBonjour.h> // https://github.com/neophob/EthernetBonjour
 #include <SPI.h>
 #include "ColorUtils.h" // custom
 #include <ArdOSC.h> // https://github.com/recotana/ArdOSC
@@ -103,17 +103,21 @@ void setup() {
   Serial.begin(38400); //19200
 
    // network
-  Ethernet.begin(myMac); // using a default myMac address, can also pass ip + mac address: (myMac ,myIp);
+  /*Ethernet.begin(myMac); // using a default myMac address, can also pass ip + mac address: (myMac ,myIp);
   // print arduino local IP address:
   Serial.print("My IP address: ");
   for (byte thisByte = 0; thisByte < 4; thisByte++) {
     Serial.print(Ethernet.localIP()[thisByte], DEC);
     Serial.print(".");
-  }
+  }*/
   
   // bonjour
-  //EthernetBonjour.begin("arduino");
-
+  Serial.println("hey -2");
+  EthernetBonjour.begin("arduino");
+  Serial.println("hey -X");
+  EthernetBonjour.addServiceRecord("Arduino._ofxBonjourIp",7777,MDNSServiceTCP);
+  Serial.println("hey -1");
+  
   // osc
   server.begin(serverPort); //ardosc
 
@@ -138,14 +142,16 @@ void setup() {
   pinMode(SPEAKER_PIN, OUTPUT); // speaker pin
 
   // timers
+  Serial.println("hey 1");
   timer.every(20, onTimerUpdate, 0); // normal update loop
   noiseTimerId = timer.every(noiseFrequencyDelay, onTimerSpeaker, 0); // speaker needs seperate loop
+  Serial.println("hey 2");
 }
 
 void loop() {
   
-  //EthernetBonjour.run();
-  
+  EthernetBonjour.run();
+  Serial.println("hey 3");
   if(!isOn) return;
 
   // using timers instead of normal loop
