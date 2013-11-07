@@ -1,14 +1,6 @@
 
-// needs wifi or ethernet for external control
-//#define USE_WIFI // http://arduino.cc/en/Main/ArduinoWiFiShield
-#define USE_ETHERNET // http://arduino.cc/en/reference/ethernet
-
-#ifdef USE_ETHERNET
-#include <Ethernet.h> // version IDE 0022
-#elif USE_WIFI
-#include <WiFi.h>   
-#endif
-
+#include <Ethernet.h> // http://arduino.cc/en/reference/ethernet
+//#include <EthernetBonjour.h>
 #include <SPI.h>
 #include "ColorUtils.h" // custom
 #include <ArdOSC.h> // https://github.com/recotana/ArdOSC
@@ -103,13 +95,6 @@ byte myIp[]  = {
 int serverPort  = 5556;
 OSCServer server;
 
-#ifdef USE_WIFI
-// Wifi WPA/WPA2 network credentials
-char ssid[] = "yourNetwork";     //  your network SSID (name) 
-char pass[] = "12345678";    // your network password
-int status = WL_IDLE_STATUS;     // the Wifi radio's status
-IPAddress ip;                    // the IP address of your shield
-#endif
 
 // ----------------------------------------------------------------------
 void setup() {
@@ -118,7 +103,6 @@ void setup() {
   Serial.begin(38400); //19200
 
    // network
-#ifdef USE_ETHERNET
   Ethernet.begin(myMac); // using a default myMac address, can also pass ip + mac address: (myMac ,myIp);
   // print arduino local IP address:
   Serial.print("My IP address: ");
@@ -126,27 +110,9 @@ void setup() {
     Serial.print(Ethernet.localIP()[thisByte], DEC);
     Serial.print(".");
   }
-#elif USE_WIFI
-  char firmwareVer[6];
-  WiFi.firmwareVersion(firmwareVer);
-  Serial.println("Wifi firmware version: ");
-  Serial.print(firmwareVer);
-  WiFi.macAddress(myMac); // populates myMac
-  // attempt to connect using WPA2 encryption:
-  Serial.println("Attempting to connect to WPA network...");
-  status = WiFi.begin(ssid, pass);
-
-  // if you're not connected, stop here:
-  if ( status != WL_CONNECTED) { 
-    Serial.println("Couldn't get a wifi connection");
-    while(true);
-  } 
-  else {
-    Serial.println("Connected to wifi network");
-    ip = WiFi.localIP();
-    Serial.println(ip);
-  }
-#endif
+  
+  // bonjour
+  //EthernetBonjour.begin("arduino");
 
   // osc
   server.begin(serverPort); //ardosc
@@ -172,11 +138,14 @@ void setup() {
   pinMode(SPEAKER_PIN, OUTPUT); // speaker pin
 
   // timers
-  timer.every(20, onTimerUpdate); // normal update loop
-  noiseTimerId = timer.every(noiseFrequencyDelay, onTimerSpeaker); // speaker needs seperate loop
+  timer.every(20, onTimerUpdate, 0); // normal update loop
+  noiseTimerId = timer.every(noiseFrequencyDelay, onTimerSpeaker, 0); // speaker needs seperate loop
 }
 
 void loop() {
+  
+  //EthernetBonjour.run();
+  
   if(!isOn) return;
 
   // using timers instead of normal loop
@@ -200,7 +169,7 @@ void loop() {
   //delay(10);
 }
 
-void onTimerUpdate() {
+void onTimerUpdate(void *context) {
 
   if(mode == 0) {
     // automatic mode change colours based on a timer
@@ -281,7 +250,7 @@ int getRollingAverage(int v) {
 
 
 // ------- SPEAKER
-void onTimerSpeaker() {
+void onTimerSpeaker(void *context) {
   if(useSpeaker) generateNoise();
 }
 
@@ -437,7 +406,7 @@ void onSpeaker(OSCMessage *_mes){
 void onNoiseFrequency(OSCMessage *_mes){
   noiseFrequencyDelay = _mes->getArgFloat(0);
   timer.stop(noiseTimerId);
-  noiseTimerId = timer.every(noiseFrequencyDelay, onTimerSpeaker); // speaker needs seperate loop
+  noiseTimerId = timer.every(noiseFrequencyDelay, onTimerSpeaker, 0); // speaker needs seperate loop
   Serial.println("noise frequency changed: ");
   Serial.print(noiseFrequencyDelay);  
 }
