@@ -4,6 +4,7 @@
 #include "ofxiOS.h"
 #include "ofxiOSExtras.h"
 #include "ofxTouchGUI.h"
+#include "ofxBonjourIp.h"
 #include "ofxMovieClip.h"
 #include "DisplayLayer.h"
 #include "ResourceManager.h"
@@ -33,6 +34,14 @@ class ofApp : public ofxiOSApp {
     ofxTouchGUI settings;
     ofxTouchGUITextInput* inputField;
     void onGuiChanged(const void* sender, string &buttonLabel);
+    
+    // connect to arduino via bonjour instead of ip
+    ofxBonjourIp bonjour;
+    void onPublishedService(const void* sender, string &serviceIp);
+    void onDiscoveredService(const void* sender, string &serviceIp);
+    void onRemovedService(const void* sender, string &serviceIp);
+    bool ignoreBonjour;
+    
     
     // night light settings
     bool isPowerOn;

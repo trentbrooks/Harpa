@@ -1,8 +1,9 @@
 #include "ofApp.h"
 
 
+UIActivityIndicatorView *busyAnimation; // spinning animation
 
-string keyboardText = "";
+
 //--------------------------------------------------------------
 void ofApp::setup(){
     ofSetFrameRate(30);
@@ -28,6 +29,20 @@ void ofApp::setup(){
     host = "10.0.1.131";
     string colourModeOptions[] = {"1. Auto change colours", "2. Don't change colours", "3. Sound changes colours"};
     //string description = "ofxTouchGUI includes slider, dropdown list, button/image button, toggle button, text/title fields, input text (ios only atm), and general fixed variables. All items are custom positioned/sized on creation. Colours, fonts, etc can be changed. Settings can be saved to XML. Values can be sent via OSC.";
+    
+    
+    // discover arduino IP via bonjour
+    bonjour.discoverService();
+    bonjour.addEventListeners(this);
+    ignoreBonjour = false;
+    
+    // add a little spinning icon thingy in the middle
+    busyAnimation = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
+    busyAnimation.frame = CGRectMake(0, 0, ofGetWidth(), ofGetHeight());
+    if(!ignoreBonjour) {
+        [busyAnimation startAnimating];
+        [ofxiPhoneGetGLParentView() addSubview:busyAnimation];
+    }
     
     
     
@@ -299,6 +314,55 @@ void ofApp::draw(){
         ofRect(settings.getWindowPosition().x, settings.getWindowPosition().y, 340, ofGetHeight());
     }
 	settings.draw();
+    
+    // not connected - show spinning progress bar and message
+    if(!bonjour.isConnectedToService() && !ignoreBonjour) {
+        ofSetColor(0, 215);
+        ofRect(0, 0, ofGetWidth(), ofGetHeight());
+        float hue = sin(ofGetElapsedTimef()/10.0) * 127.5 + 127.5;
+        ofSetColor(ofColor::fromHsb(hue,255,255)); // 252,212,0);
+        settings.drawTitleText("SEARCHING FOR HARPA'S NIGHT LIGHT...", 304, 462);
+    }
+}
+
+//--------------------------------------------------------------
+void ofApp::onPublishedService(const void* sender, string &serviceIp) {
+    ofLog() << "Received published service event: " << serviceIp;
+}
+
+void ofApp::onDiscoveredService(const void* sender, string &serviceIp) {
+    ofLog() << "Received discovered service event: " << serviceIp;
+    
+    // arduino device was discovered - now reset OSC.
+    host = serviceIp;
+    if(settings.getHostOSC() != host) {
+        ofLog() << "Changed OSC host address: " << host;
+        settings.setupSendOSC(host, port);
+    }
+    inputField->setPlaceHolderText(host);
+    
+    // remove/stop spinning animation
+    if(!ignoreBonjour) {
+        [busyAnimation stopAnimating];
+        [busyAnimation removeFromSuperview];
+    }
+    
+}
+
+void ofApp::onRemovedService(const void* sender, string &serviceIp) {
+    ofLog() << "Received removed service event: " << serviceIp;
+    
+    // close settings if open
+    if(settings.activePanel == 0) {
+        settings.showPanel(1);
+    }
+    
+    // add/start spinning animation
+    if(!ignoreBonjour) {
+        [busyAnimation startAnimating];
+        [ofxiPhoneGetGLParentView() addSubview:busyAnimation];
+    }
+    
 }
 
 //--------------------------------------------------------------
@@ -309,6 +373,8 @@ void ofApp::exit(){
 //--------------------------------------------------------------
 void ofApp::touchDown(ofTouchEventArgs & touch){
 
+    if(!bonjour.isConnectedToService() && !ignoreBonjour) return;
+    
     settings.onDown(touch.x, touch.y);
     if(settings.activePanel == 0) return;
     for(int i = 0; i < mainButtons.size(); i++) mainButtons[i]->onDown(touch.x, touch.y);
@@ -316,6 +382,9 @@ void ofApp::touchDown(ofTouchEventArgs & touch){
 
 //--------------------------------------------------------------
 void ofApp::touchMoved(ofTouchEventArgs & touch){
+    
+    if(!bonjour.isConnectedToService() && !ignoreBonjour) return;
+    
     settings.onMoved(touch.x, touch.y);
     if(settings.activePanel == 0) return;
     for(int i = 0; i < mainButtons.size(); i++) mainButtons[i]->onMoved(touch.x, touch.y);
@@ -323,6 +392,9 @@ void ofApp::touchMoved(ofTouchEventArgs & touch){
 
 //--------------------------------------------------------------
 void ofApp::touchUp(ofTouchEventArgs & touch){
+    
+    if(!bonjour.isConnectedToService() && !ignoreBonjour) return;
+    
     settings.onUp(touch.x, touch.y);
     if(settings.activePanel == 0) return;
     for(int i = 0; i < mainButtons.size(); i++) mainButtons[i]->onUp(touch.x, touch.y);
