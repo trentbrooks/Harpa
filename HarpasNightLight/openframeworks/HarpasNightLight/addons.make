@@ -2,3 +2,4 @@ ofxMovieClip
 ofxOsc
 ofxTouchGUI
 ofxXmlSettings
+ofxBonjourIp
