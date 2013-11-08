@@ -5,16 +5,27 @@
 #include "ColorUtils.h" // custom
 #include <ArdOSC.h> // https://github.com/recotana/ArdOSC
 #include <Timer.h> // https://github.com/JChristensen/Timer
+#include <MemoryFree.h>
 
 
+// MEMORY TEST
+/*
+http://arduino.cc/en/Tutorial/Memory
+http://playground.arduino.cc/Code/AvailableMemory
+Need to compare mega + uno
+arduino mega total = 7465 bytes (SRAM?)
+begin setup = 5933
+end of setup = 5747
+loop = 5761
+*/
 
+// -------
 // TIMER
 Timer timer;
 
 // POWER
 boolean isOn = true;
 
-// -------
 // MICROPHONE: reads mic level, compares against average. once loud enough sounds
 // detected - it waits a certain amount (eg. 15 seconds) of time before resetting.
 int SPL_PIN = A1;   // the SPL output is connected to analog pin 0
@@ -31,7 +42,6 @@ boolean useMic = false;
 int soundLevel = 0; // mic level
 float soundRange = 700.0f; // mic sensor range: 0 (min) - 700 (max)
 
-// -------
 // SPEAKER: plays white noise or ?
 int SPEAKER_PIN = 9;
 float noiseFrequencyDelay = .05; // used to be 50
@@ -45,7 +55,6 @@ fucked the leds... need to buy more
  light 4 has no blue or green
  */
 
-// -------ch
 // RGB LEDS: fades/lerps between colours. led's are daisy chained. they change automatically
 // if mode = 0 (eg. every 5 seconds), or can be changed manually via osc (1) or sound detection (2).
 int LED_CLOCK_PIN = 2; // clock pin
@@ -57,23 +66,23 @@ uint32_t newHex = 0xffff00;
 int lightCount = 4; // Number of RGBLED modules connected
 Color currentLedRGB[] = { 
   {
-    0,0,0    }
+    0,0,0      }
   , {
-    0,0,0    }
+    0,0,0      }
   , {
-    0,0,0    }
+    0,0,0      }
   , {
-    0,0,0    } 
+    0,0,0      } 
 };
 Color newLedRGB[] = { 
   {
-    0,255,0    }
+    0,255,0      }
   , {
-    255,127,0    }
+    255,127,0      }
   , {
-    255,255,0    }
+    255,255,0      }
   , {
-    255,0,0    } 
+    255,0,0      } 
 };
 int hues[] = {
   0,0,0,0}; // custom per led
@@ -86,53 +95,56 @@ long previousMillis = 0;
 boolean changeColor = false;
 int mode = 2; // 0 = auto change, 1 = manual, 2 = sound/mic
 
-// -------
 // OSC: some settings can be changed via osc (eg. iphone). make sure correct ip is used on phone.
 byte myMac[] = { 
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 byte myIp[]  = { 
   192, 168, 1, 9 }; // not required by arduino software, but good to know for phone/osc
-int serverPort  = 5556;
-OSCServer server;
+int oscPort  = 5556;
+OSCServer oscServer;
+
+// BONJOUR: easy to discover arduino when service is registered on local network (don't need to know ip address)
+int bonjourPort = 7777;
+char bonjourServiceName[] = "Arduino._ofxBonjourIp"; // device is "Arduino", service is "_ofxBonjourIp._tcp"
 
 
 // ----------------------------------------------------------------------
 void setup() {
-
+    
   // baud rate
   Serial.begin(38400); //19200
+  
+  //Serial.println("Memory: Setup begin=");
+  //Serial.println(freeMemory());
 
-   // network
-  /*Ethernet.begin(myMac); // using a default myMac address, can also pass ip + mac address: (myMac ,myIp);
+    // network
+  Ethernet.begin(myMac); // using a default myMac address, can also pass ip + mac address: (myMac ,myIp);
   // print arduino local IP address:
   Serial.print("My IP address: ");
   for (byte thisByte = 0; thisByte < 4; thisByte++) {
     Serial.print(Ethernet.localIP()[thisByte], DEC);
     Serial.print(".");
-  }*/
-  
+  }
+
   // bonjour
-  Serial.println("hey -2");
-  EthernetBonjour.begin("arduino");
-  Serial.println("hey -X");
-  EthernetBonjour.addServiceRecord("Arduino._ofxBonjourIp",7777,MDNSServiceTCP);
-  Serial.println("hey -1");
-  
+  EthernetBonjour.begin(); // entering a name here has no effect
+  EthernetBonjour.addServiceRecord(bonjourServiceName,bonjourPort,MDNSServiceTCP);
+
   // osc
-  server.begin(serverPort); //ardosc
+  oscServer.begin(oscPort); //ardosc
 
   // set callback functions for osc
-  server.addCallback("/hueAll",&onHueAll);
-  server.addCallback("/hue1",&onHue1);
-  server.addCallback("/hue2",&onHue2);
-  server.addCallback("/hue3",&onHue3);
-  server.addCallback("/hue4",&onHue4);
-  server.addCallback("/brightness",&onBrightness);
-  server.addCallback("/saturation",&onSaturation);
-  server.addCallback("/mode",&onMode);
-  server.addCallback("/microphone",&onMicrophone);
-  server.addCallback("/speaker",&onSpeaker);
-  server.addCallback("/noisefrequency",&onNoiseFrequency);
+  oscServer.addCallback("/hueAll",&onHueAll);
+  oscServer.addCallback("/hue1",&onHue1);
+  oscServer.addCallback("/hue2",&onHue2);
+  oscServer.addCallback("/hue3",&onHue3);
+  oscServer.addCallback("/hue4",&onHue4);
+  oscServer.addCallback("/brightness",&onBrightness);
+  oscServer.addCallback("/saturation",&onSaturation);
+  oscServer.addCallback("/mode",&onMode);
+  oscServer.addCallback("/microphone",&onMicrophone);
+  oscServer.addCallback("/speaker",&onSpeaker);
+  oscServer.addCallback("/noisefrequency",&onNoiseFrequency);
 
 
   // inputs + outputs
@@ -142,23 +154,25 @@ void setup() {
   pinMode(SPEAKER_PIN, OUTPUT); // speaker pin
 
   // timers
-  Serial.println("hey 1");
   timer.every(20, onTimerUpdate, 0); // normal update loop
   noiseTimerId = timer.every(noiseFrequencyDelay, onTimerSpeaker, 0); // speaker needs seperate loop
-  Serial.println("hey 2");
+
+  //Serial.println("Memory: Setup complete=");
+  //Serial.println(freeMemory());
+  Serial.println("\nsetup complete");
 }
 
 void loop() {
-  
+
+  // bonjour + osc run all the time
   EthernetBonjour.run();
-  Serial.println("hey 3");
+  oscServer.aviableCheck(); // > 0
+
+  // if not powered don't do anything else
   if(!isOn) return;
 
   // using timers instead of normal loop
   timer.update();
-
-  // required for osc
-  //server.aviableCheck(); // > 0
 
   // sound levels
   //checkMic();
@@ -173,6 +187,10 @@ void loop() {
   // do i need this? might interfere with microphone frequency
   // maybe use timers? http://arduino.cc/playground/Code/Timer
   //delay(10);
+  
+  //Serial.println("Memory: loop=");
+  //Serial.println(freeMemory());
+  //delay(1000);
 }
 
 void onTimerUpdate(void *context) {
@@ -475,6 +493,7 @@ void onPower(OSCMessage *_mes){
  digitalWrite(CKI, LOW);
  //delayMicroseconds(500); //Wait for 500us to go into reset
  }*/
+
 
 
 
