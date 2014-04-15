@@ -28,7 +28,7 @@ uint32_t ColorUtils::lerpHex (uint32_t hex, uint32_t hex2, float ratio){
 }
 
 // create a 24 bit color value from R,G,B
-uint32_t ColorUtils::rgbToHex(byte r, byte g, byte b) {
+uint32_t ColorUtils::rgbToHex(uint8_t r, uint8_t g, uint8_t b) {
   uint32_t c;
   c = r;
   c <<= 8;
@@ -38,8 +38,13 @@ uint32_t ColorUtils::rgbToHex(byte r, byte g, byte b) {
   return c;
 }
 
+void ColorUtils::setRGB(Color& clr, uint8_t r, uint8_t g, uint8_t b) {
+  clr.r = r;
+  clr.g = g;
+  clr.b = b;
+}
 
-void ColorUtils::setHsb(Color& clr, float hue, float saturation, float brightness) {
+void ColorUtils::setHSB(Color& clr, float hue, float saturation, float brightness) {
   if(brightness == 0) { // black
     clr.r = clr.g = clr.b = 0;
   } 

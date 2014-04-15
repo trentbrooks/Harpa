@@ -11,9 +11,9 @@
 
 // -------
 struct Color {
-  byte r;
-  byte g;
-  byte b;
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
 };
 
 // -------
@@ -23,10 +23,11 @@ class ColorUtils
     ColorUtils();
     
     // static methods
-    static uint32_t rgbToHex(byte r, byte g, byte b);
+    static uint32_t rgbToHex(uint8_t r, uint8_t g, uint8_t b);
     static uint32_t lerpHex (uint32_t hex, uint32_t hex2, float ratio);
     static void lerpRGB(Color& from, Color& to, float amount);
-    static void setHsb(Color& clr, float hue, float saturation, float brightness);
+    static void setHSB(Color& clr, float hue, float saturation, float brightness);
+    static void setRGB(Color& clr, uint8_t r, uint8_t g, uint8_t b);
 };
 
 

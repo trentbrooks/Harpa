@@ -1,10 +1,10 @@
 
+
 // comment/uncomment these to test memory footprints
 #define USE_SERIAL_PRINT
 #define USE_ETHERNET
-#define USE_BONJOUR // cannot have bonjour without ethernet
+//#define USE_BONJOUR // cannot have bonjour without ethernet
 #define USE_OSC
-#define USE_NEOPIXELS
 
 #ifdef USE_ETHERNET
 #include <Ethernet.h> // http://arduino.cc/en/reference/ethernet
@@ -18,105 +18,74 @@
 #endif
 #include "ColorUtils.h" // custom
 #include <Timer.h> // https://github.com/JChristensen/Timer
-//#include <MemoryFree.h>
-#ifdef USE_NEOPIXELS
 #include <Adafruit_NeoPixel.h>
-#endif
 
-
-// MEMORY TEST
-/*
-http://arduino.cc/en/Tutorial/Memory
- http://playground.arduino.cc/Code/AvailableMemory
- Need to compare mega + uno
- arduino mega total = 7465 bytes (SRAM?)
- begin setup = 5933
- end of setup = 5747
- loop = 5761
- // max bytes for app..
- mega- 258048
- uno- 32256
- 
- everything-34116
- no ethernet, bonjour, osc- 10600
- no bonjour-23420
- no osc-28930
- 
- osc callbacks around -3000 bytes
- */
 
 // -------
-// TIMER
-Timer timer; // used to replace standard loop
-
 // POWER
 boolean isOn = true;
 
+
+// TIMER
+Timer timer; // used to replace standard loop
+int8_t normalTimerId;
+int8_t speakerTimerId;
+
 // MICROPHONE: reads mic level, compares against average. once loud enough sounds
 // detected - it waits a certain amount (eg. 15 seconds) of time before resetting.
-int SPL_PIN = A1;   // the SPL output is connected to analog pin 0
-int micReadCount = 120; // max number of samples for average
-int micValues[120]; // same number of samples
+const int MIC_PIN = A1;   // the SPL output is connected to analog pin 0
+boolean useMic = false;
+const int MAX_MIC_SAMPLES = 120;
+int micReadCount = MAX_MIC_SAMPLES; // max number of samples for average
+int micValues[MAX_MIC_SAMPLES]; // same number of samples
 float differenceScale = 0.5; // how different the read needs to be from the average (0.0 = same, 1.0 = opposite/very different)
 int micSum = 0; // sound levels total
 int micPos = 0; // array index
 int soundResetCount = 0;
-int soundResetTimeLimit = 30; 
+int soundResetTimeLimit = 30;
 boolean soundChanged = false;
 boolean fadeOnSound = false;
-boolean useMic = false;
 int soundLevel = 0; // mic level
 float soundRange = 700.0f; // mic sensor range: 0 (min) - 700 (max)
 
-// SPEAKER: plays white noise or ?
-int SPEAKER_PIN = 9;
-float noiseFrequencyDelay = .05; // used to be 50
-int8_t noiseTimerId;
+
+// SPEAKER: plays white noise
+const int SPEAKER_PIN = 9;
 boolean useSpeaker = true;
+float noiseFrequencyDelay = .05; // used to be 50
 
-/*
-fucked the leds... need to buy more
- light 1 has no blue,
- light 2,3 ok
- light 4 has no blue or green
- */
 
-// RGB LEDS: fades/lerps between colours. led's are daisy chained. they change automatically
+
+// RGB LEDS: fades/lerps between colours.
 // if mode = 0 (eg. every 5 seconds), or can be changed manually via osc (1) or sound detection (2).
-#ifdef USE_NEOPIXELS
-int numNeoPixels = 4;
-int  neoPin = 5;
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(numNeoPixels, neoPin, NEO_GRB + NEO_KHZ800);
-#endif
-int LED_CLOCK_PIN = 2; // clock pin
-int LED_SERIAL_PIN = 3; // serial data pin
-uint32_t currentHex = 0xff0000;
-uint32_t newHex = 0xffff00;
-//Color currentRGB = {0,0,255}; // from color
-//Color newRGB = {255,255,0}; // to color
-int lightCount = 4; // Number of RGBLED modules connected
-Color currentLedRGB[] = { {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0} }; 
-//Color newLedRGB[] = { {0,255,0}, {0,255,0}, {255,127,0}, {255,255,0}, {255,0,0} };
-Color newLedRGB[] = { {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0} };
-int hues[] = { 0,0,0,0}; // custom per led
+const int NUM_LEDS = 30;
+const int LED_PIN = 5;
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+Color currentLedRGB[NUM_LEDS];
+Color newLedRGB[NUM_LEDS];
+int hues[NUM_LEDS];
 int brightness = 255;
 int saturation = 255;
+int activeLeds = NUM_LEDS;
 float lerpInc = 0.0025;//025;//5;
 float lerpAmount = 0;
-int delayTime=5000;
+int fadeDelayTime=5000;
 long previousMillis = 0;
 boolean changeColor = false;
 int mode = 2; // 0 = auto change, 1 = manual, 2 = sound/mic
 
-// OSC: some settings can be changed via osc (eg. iphone). make sure correct ip is used on phone.
+// NETWORK/OSC: some settings can be changed via osc (eg. from iphone). make sure correct ip is used on phone if no bonjour.
+int ethernetConnected = 0;
+boolean hasEthernetBlinked = false;
 #ifdef USE_OSC
+const int OSC_PORT = 5556;
 OSCServer oscServer;
-int oscPort = 5556;
+#endif
+#ifdef USE_BONJOUR
+const int BONJOUR_PORT = 7777;
+const String BONJOUR_SERVICE = "Arduino._ofxBonjourIp";
 #endif
 
-// net
-int ethernetConnected;
-boolean hasEthernetBlinked = false;
 
 // ----------------------------------------------------------------------
 void setup() {
@@ -124,13 +93,12 @@ void setup() {
   // baud rate
   Serial.begin(38400); //19200
 
-    //Serial.println("Memory: Setup begin=");
+  //Serial.println("Memory: Setup begin=");
   //Serial.println(freeMemory());
 
   // network
 #ifdef USE_ETHERNET
-  byte myMac[] = { 
-    0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED   };
+  byte myMac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
   ethernetConnected = Ethernet.begin(myMac); // using a default myMac address, can also pass ip + mac address: (myMac ,myIp);
   // print arduino local IP address:
 #ifdef USE_SERIAL_PRINT
@@ -151,28 +119,26 @@ void setup() {
   Serial.print("\nBonjour connected: ");
   Serial.print(bonjourConnected);
 #endif
-  EthernetBonjour.addServiceRecord("Arduino._ofxBonjourIp",7777,MDNSServiceTCP);
+  EthernetBonjour.addServiceRecord(BONJOUR_SERVICE, BONJOUR_PORT, MDNSServiceTCP);
 #endif
 #endif
 
   // osc
 #ifdef USE_OSC
-  int oscConnected = oscServer.begin(oscPort); //ardosc
+  int oscConnected = oscServer.begin(OSC_PORT); //ardosc
 #ifdef USE_SERIAL_PRINT
   Serial.print("\nOSC connected: ");
   Serial.print(oscConnected);
   Serial.print(" Port: ");
-  Serial.print(oscPort);
+  Serial.print(OSC_PORT);
 #endif
 
   // set callback functions for osc
-  oscServer.addCallback("/hueAll",&onHueAll);
-  oscServer.addCallback("/hue1",&onHue1);
-  oscServer.addCallback("/hue2",&onHue2);
-  oscServer.addCallback("/hue3",&onHue3);
-  oscServer.addCallback("/hue4",&onHue4);
+  oscServer.addCallback("/hue",&onHue);
   oscServer.addCallback("/brightness",&onBrightness);
   oscServer.addCallback("/saturation",&onSaturation);
+  oscServer.addCallback("/leds",&onLedCount); // NEW
+  oscServer.addCallback("/fadedelay",&onFadeDelay); // NEW  
   oscServer.addCallback("/mode",&onMode);
   oscServer.addCallback("/microphone",&onMicrophone);
   oscServer.addCallback("/micsamples", &onMicSamples); // NEW
@@ -182,19 +148,29 @@ void setup() {
 #endif
 
   // inputs + outputs
-  pinMode(LED_SERIAL_PIN, OUTPUT); // led serial pin
-  pinMode(LED_CLOCK_PIN, OUTPUT); // led clock pin
-  pinMode(SPL_PIN, INPUT); // mic pin
+  pinMode(MIC_PIN, INPUT); // mic pin
   pinMode(SPEAKER_PIN, OUTPUT); // speaker pin
-  
-  #ifdef USE_NEOPIXELS
+
+  // Initialize all pixels/LEDS to 'off'
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
-  #endif
+
+  // if the internet is connected all leds start green, otherwise red
+  /*for(int i = 0; i < NUM_LEDS; i++)  {
+      if(ethernetConnected == 1) {
+        // all lights are green - we are connected
+        hues[i] = 85;
+        ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
+      } else {
+        // all lights are red
+        hues[i] = 0;
+        ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
+      }
+  }*/
 
   // timers
-  int8_t normalTImerId = timer.every(20, onTimerUpdate, 0); // normal update loop
-  noiseTimerId = timer.every(noiseFrequencyDelay, onTimerSpeaker, 0); // speaker needs seperate loop
+  normalTimerId = timer.every(20, onTimerUpdate, 0); // normal update loop
+  speakerTimerId = timer.every(noiseFrequencyDelay, onTimerSpeaker, 0); // speaker needs seperate loop
 
   //Serial.println("Memory: Setup complete=");
   //Serial.println(freeMemory());
@@ -205,32 +181,32 @@ void setup() {
 
 void loop() {
 
-  // flash the built in led (pin 13) 10 times to signal were connected to network
-  // TODO: change this so all the leds initialise green when connected or red when not
+  // all the leds initialise green when connected to netwrok or red when not
   if(!hasEthernetBlinked) {
     if(ethernetConnected == 1) {
-      /*for(int i = 0; i < 10; i++) {
-        digitalWrite(13, HIGH);
-        delay(500); 
-        digitalWrite(13, LOW);
-        delay(500);
-      }*/
-      
+
       // all lights are green - we are connected
-      lerpAmount = 0.0;
-      for(int i = 0; i < lightCount; i++)  {
+      Color green = {0,255,0};
+      colorWipe(green, 50);
+
+      /*lerpAmount = 0.0;
+      for(int i = 0; i < NUM_LEDS; i++)  {
         hues[i] = 85;
-        ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
-      }
+        ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
+      }*/
     } else {
+
       // all lights are red
-      lerpAmount = 0.0;
-      for(int i = 0; i < lightCount; i++)  {
+      Color red = {255,0,0};
+      colorWipe(red, 50);
+
+      /*lerpAmount = 0.0;
+      for(int i = 0; i < NUM_LEDS; i++)  {
         hues[i] = 0;
-        ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
-      }
+        ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
+      }*/
     }
-    
+
     hasEthernetBlinked = true;
   }
 
@@ -245,28 +221,14 @@ void loop() {
 #endif
 
   // if not powered don't do anything else
+  // TODO: make sure everything is turned off first
   if(!isOn) return;
 
-  // using timers instead of normal loop
+  // using timers instead of normal loop for...
+  // 1. updateLeds()
+  // 2. updateMic()
+  // 3. updateSpeaker() (custom timer)
   timer.update();
-
-  // sound levels
-  //checkMic();
-
-  // speaker - moved 
-  //checkSpeaker();
-
-  // rgb leds
-  //checkLeds();
-
-  // short delay for serial data and stuff
-  // do i need this? might interfere with microphone frequency
-  // maybe use timers? http://arduino.cc/playground/Code/Timer
-  //delay(10);
-
-  //Serial.println("Memory: loop=");
-  //Serial.println(freeMemory());
-  //delay(1000);
 }
 
 void onTimerUpdate(void *context) {
@@ -274,10 +236,10 @@ void onTimerUpdate(void *context) {
   if(mode == 0) {
     // automatic mode change colours based on a timer
     autoRandomiseColor();
-  } 
+  }
   else if(mode == 1) {
     // manually change lights via osc
-  } 
+  }
   else if(mode == 2) {
     // change lights based on sound input
     updateMic();
@@ -293,20 +255,20 @@ void updateMic() {
   if(useMic) {
 
     // detect sound level, rolling average, and difference
-    soundLevel = analogRead(SPL_PIN);
+    soundLevel = analogRead(MIC_PIN);
     int avg = getRollingAverage(soundLevel);
     float diff = abs(soundLevel - avg) / soundRange; // normalised 0 - 1.0f
 
     // 1) sound either turns leds on/off (defined by fadeOnSound), then waits for delay before resetting
-    // eg. if baby cries, then the lights go off - this would be a cruel way to train a baby not to cry. 
+    // eg. if baby cries, then the lights go off - this would be a cruel way to train a baby not to cry.
     /*if(!soundChanged) {
      // check if current read is x amount greater than average
-     if(diff > differenceScale)  {       
+     if(diff > differenceScale)  {
      soundChanged = true;
      brightness = (fadeOnSound) ? 0 : 255;
-     setHsb(newRGB, hue, 255, brightness);
+     setHSB(newRGB, hue, 255, brightness);
      }
-     } 
+     }
      else {
      // reset after threshold
      soundResetCount++;
@@ -315,18 +277,17 @@ void updateMic() {
      }
      }*/
 
-    // 2) sound could change the colour of the leds instead of turning led on/off   
+    // 2) sound could change the colour of the leds instead of turning led on/off
     if(!soundChanged) {
       if(diff > differenceScale) {
         soundChanged = true;
         lerpAmount = 0;
-        //ColorUtils::setHsb(newRGB, hue, 255, brightness);
-        for(int i = 0; i < lightCount; i++)  {
+        for(int i = 0; i < activeLeds; i++)  {
           hues[i] = random(0,255);
-          ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+          ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
         }
       }
-    } 
+    }
     else {
       // reset after threshold
       soundResetCount++;
@@ -343,8 +304,8 @@ void updateMic() {
 int getRollingAverage(int v) {
   micSum -= micValues[micPos];  // only need the array to subtract old value
   micSum += v;
-  micValues[micPos] = v;     
-  //micPos = (micPos + 1) % micReadCount; 
+  micValues[micPos] = v;
+  //micPos = (micPos + 1) % micReadCount;
   if (++micPos == micReadCount) micPos = 0;
   return micSum / micReadCount;
 }
@@ -353,9 +314,12 @@ int getRollingAverage(int v) {
 // ------- SPEAKER
 void onTimerSpeaker(void *context) {
   //Serial.println("got speaker?");
-  if(useSpeaker) generateNoise();
+  updateSpeaker();
 }
 
+void updateSpeaker() {
+  if(useSpeaker) generateNoise();
+}
 
 void generateNoise(){
   unsigned long int newr;
@@ -373,7 +337,7 @@ void generateNoise(){
 
   // use timer instead of below
   //delayMicroseconds (noiseFrequencyDelay); // Changing this value changes the frequency.
-} 
+}
 
 
 // ------- RGB LEDS
@@ -382,104 +346,115 @@ void updateLeds() {
 
   if(lerpAmount < 1) lerpAmount += lerpInc;
 
-  #ifdef USE_NEOPIXELS
-  for(int i = 0; i < lightCount; i++)  {
+  for(int i = 0; i < NUM_LEDS; i++)  {
     ColorUtils::lerpRGB(currentLedRGB[i], newLedRGB[i], lerpAmount);
     //uint32_t hexForLed =  ColorUtils::rgbToHex(currentLedRGB[i].r,currentLedRGB[i].g,currentLedRGB[i].b);
     strip.setPixelColor(i, currentLedRGB[i].r,currentLedRGB[i].g,currentLedRGB[i].b);
   }
   strip.show();
-  #else
-  long mask; //
-  for(int i = 0; i < lightCount; i++)  {
 
-    ColorUtils::lerpRGB(currentLedRGB[i], newLedRGB[i], lerpAmount);
-    uint32_t hexForLed =  ColorUtils::rgbToHex(currentLedRGB[i].r,currentLedRGB[i].g,currentLedRGB[i].b);
-
-    for(byte color_bit = 23 ; color_bit != 255 ; color_bit--) {
-      //Feed color bit 23 first (red data MSB)
-      digitalWrite(LED_CLOCK_PIN, LOW); //Only change data when clock is low
-      mask = 1L << color_bit;
-      //The 1'L' forces the 1 to start as a 32 bit number, otherwise it defaults to 16-bit.
-      if(hexForLed & mask) {
-        digitalWrite(LED_SERIAL_PIN, HIGH);
-      } 
-      else {
-        digitalWrite(LED_SERIAL_PIN, LOW);
-      }
-
-      digitalWrite(LED_CLOCK_PIN, HIGH); //Data is latched when clock goes high
-    }
-  }
-
-  //Pull clock low to put strip into reset/post mode
-  digitalWrite(LED_CLOCK_PIN, LOW);
-  #endif
 }
-
 
 void autoRandomiseColor() {
   unsigned long currentMillis = millis();
-  if(currentMillis - previousMillis > delayTime) {
-    previousMillis = currentMillis;   
-    lerpAmount = 0;    
-    //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
-    for(int i = 0; i < lightCount; i++)  {
+  if(currentMillis - previousMillis > fadeDelayTime) {
+    previousMillis = currentMillis;
+    lerpAmount = 0;
+    //ColorUtils::setHSB(newRGB, hue, saturation, brightness);
+    for(int i = 0; i < activeLeds; i++)  {
       hues[i] = random(0,255);
-      ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+      ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
     }
-  } 
+  }
+}
+
+// Adafruit example animations (modified to use Color struct)
+// note - these rely on delays
+// for compatibility with own color tweeening library, also set my arrays to same as adafruit lib
+// Fill the dots one after the other with a color
+void colorWipe(Color c, uint8_t wait) {
+
+  // no need to lerp colors, due to delays
+  lerpAmount = 1.0;
+
+  for(int i=0; i<strip.numPixels(); i++) {
+
+      ColorUtils::setRGB(newLedRGB[i], c.r, c.g, c.b);
+      ColorUtils::setRGB(currentLedRGB[i], c.r, c.g, c.b);
+      strip.setPixelColor(i, c.r, c.g, c.b);
+      strip.show();
+      delay(wait);
+  }
+}
+
+// Theatre-style crawling lights.
+void theaterChase(Color c, uint8_t wait) {
+
+  // no need to lerp colors, due to delays
+  lerpAmount = 1.0;
+
+  for (int j=0; j<10; j++) {  //do 10 cycles of chasing
+    for (int q=0; q < 3; q++) {
+      for (int i=0; i < strip.numPixels(); i=i+3) {
+        ColorUtils::setRGB(newLedRGB[i+q], c.r, c.g, c.b);
+        ColorUtils::setRGB(currentLedRGB[i+q], c.r, c.g, c.b);
+        strip.setPixelColor(i+q, c.r, c.g, c.b);    //turn every third pixel on
+      }
+      strip.show();
+
+      delay(wait);
+      for (int i=0; i < strip.numPixels(); i=i+3) {
+        ColorUtils::setRGB(newLedRGB[i+q], 0,0,0);
+        ColorUtils::setRGB(currentLedRGB[i+q], 0,0,0);
+        strip.setPixelColor(i+q, 0);        //turn every third pixel off
+      }
+    }
+  }
+}
+
+// copying adafruit rainbow stuff to use Color struct
+void rainbow(uint8_t wait) {
+
+  uint16_t i, j;
+  Color c;
+
+  for(j=0; j<256; j++) {
+    for(i=0; i<strip.numPixels(); i++) {
+
+      wheel(c, i);
+      ColorUtils::setRGB(newLedRGB[i], c.r, c.g, c.b);
+      ColorUtils::setRGB(currentLedRGB[i], c.r, c.g, c.b);
+      strip.setPixelColor(i, c.r, c.g, c.b);
+      //strip.setPixelColor(i, Wheel((i+j) & 255));
+    }
+    strip.show();
+    delay(wait);
+  }
+}
+
+void wheel(Color clr, byte WheelPos) {
+
+  if(WheelPos < 85) {
+   ColorUtils::setRGB(clr, WheelPos * 3, 255 - WheelPos * 3, 0);
+  } else if(WheelPos < 170) {
+   WheelPos -= 85;
+   ColorUtils::setRGB(clr, 255 - WheelPos * 3, 0, WheelPos * 3);
+  } else {
+   WheelPos -= 170;
+   ColorUtils::setRGB(clr, 0, WheelPos * 3, 255 - WheelPos * 3);
+  }
 }
 
 
 // ------- OSC events
+// ifdef not working here
 #ifdef USE_OSC
-void onHue1(OSCMessage *_mes){
-  hues[0] = _mes->getArgInt32(0);
-  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
-  ColorUtils::setHsb(newLedRGB[0], hues[0], saturation, brightness);
-#ifdef USE_SERIAL_PRINT
-  Serial.print("\nHue1 changed: ");
-  Serial.print(hues[0]);
-#endif
-}
-
-void onHue2(OSCMessage *_mes){
-  hues[1] = _mes->getArgInt32(0);
-  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
-  ColorUtils::setHsb(newLedRGB[1], hues[1], saturation, brightness);
-#ifdef USE_SERIAL_PRINT
-  Serial.print("hue2 changed: ");
-  Serial.print(hues[1]);
-#endif
-}
-
-void onHue3(OSCMessage *_mes){
-  hues[2] = _mes->getArgInt32(0);
-  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
-  ColorUtils::setHsb(newLedRGB[2], hues[2], saturation, brightness);
-#ifdef USE_SERIAL_PRINT
-  Serial.print("\nHue3 changed: ");
-  Serial.print(hues[2]);
-#endif
-}
-
-void onHue4(OSCMessage *_mes){
-  hues[3] = _mes->getArgInt32(0);
-  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
-  ColorUtils::setHsb(newLedRGB[3], hues[3], saturation, brightness);
-#ifdef USE_SERIAL_PRINT
-  Serial.print("\nHue4 changed: ");
-  Serial.print(hues[3]);
-#endif
-}
-
-void onHueAll(OSCMessage *_mes){
+void onHue(OSCMessage *_mes){
   int hue = _mes->getArgInt32(0);
-  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
-  for(int i = 0; i < lightCount; i++)  {
+  //ColorUtils::setHSB(newRGB, hue, saturation, brightness);
+  for(int i = 0; i < activeLeds; i++)  {
     hues[i] = hue;
-    ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+    ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
   }
 #ifdef USE_SERIAL_PRINT
   Serial.print("\nHues changed: ");
@@ -487,11 +462,12 @@ void onHueAll(OSCMessage *_mes){
 #endif
 }
 
+
 void onBrightness(OSCMessage *_mes){
   brightness = _mes->getArgInt32(0);
-  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
-  for(int i = 0; i < lightCount; i++)  {
-    ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+  //ColorUtils::setHSB(newRGB, hue, saturation, brightness);
+  for(int i = 0; i < activeLeds; i++)  {
+    ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
   }
 #ifdef USE_SERIAL_PRINT
   Serial.print("\nBrightness changed: ");
@@ -501,15 +477,40 @@ void onBrightness(OSCMessage *_mes){
 
 void onSaturation(OSCMessage *_mes){
   saturation = _mes->getArgInt32(0);
-  //ColorUtils::setHsb(newRGB, hue, saturation, brightness);
-  for(int i = 0; i < lightCount; i++)  {
-    ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+  //ColorUtils::setHSB(newRGB, hue, saturation, brightness);
+  for(int i = 0; i < activeLeds; i++)  {
+    ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
   }
 #ifdef USE_SERIAL_PRINT
   Serial.print("\nSaturation changed: ");
   Serial.print(saturation);
 #endif
 }
+
+void onLedCount(OSCMessage *_mes) {
+  activeLeds = _mes->getArgInt32(0);
+  
+  // switch the other led's to black/off
+  for(int i = 0; i < NUM_LEDS; i++)  {
+    if(i > activeLeds) {
+      ColorUtils::setHSB(newLedRGB[i], 0, 0, 0);
+      ColorUtils::setHSB(currentLedRGB[i], 0, 0, 0);
+    }  
+  }
+#ifdef USE_SERIAL_PRINT
+  Serial.print("\nActive leds changed: ");
+  Serial.print(activeLeds);
+#endif
+}
+
+void onFadeDelay(OSCMessage *_mes) {
+  fadeDelayTime = _mes->getArgInt32(0);
+#ifdef USE_SERIAL_PRINT
+  Serial.print("\nFade delay changed: ");
+  Serial.print(fadeDelayTime);
+#endif
+}
+  
 
 void onMode(OSCMessage *_mes){
   mode = _mes->getArgInt32(0);
@@ -529,6 +530,7 @@ void onMicrophone(OSCMessage *_mes){
 
 void onMicSamples(OSCMessage *_mes) {
   micReadCount = _mes->getArgInt32(0); // 0-120
+  if(micReadCount > MAX_MIC_SAMPLES) micReadCount = MAX_MIC_SAMPLES;
 #ifdef USE_SERIAL_PRINT
   Serial.print("\nMicrophone samples changed: ");
   Serial.print(micReadCount);
@@ -547,39 +549,40 @@ void onSpeaker(OSCMessage *_mes){
   useSpeaker = _mes->getArgInt32(0);
 #ifdef USE_SERIAL_PRINT
   Serial.print("\nSpeaker changed: ");
-  Serial.print(useSpeaker); 
-#endif 
+  Serial.print(useSpeaker);
+#endif
 }
 
 
 void onNoiseFrequency(OSCMessage *_mes){
   noiseFrequencyDelay = _mes->getArgFloat(0); // 0-0.2
-  timer.stop(noiseTimerId);
-  noiseTimerId = timer.every(noiseFrequencyDelay, onTimerSpeaker, 0); // speaker needs seperate loop
+  timer.stop(speakerTimerId);
+  speakerTimerId = timer.every(noiseFrequencyDelay, onTimerSpeaker, 0); // speaker needs seperate loop
 #ifdef USE_SERIAL_PRINT
   Serial.print("\nNoise frequency changed: ");
-  Serial.print(noiseFrequencyDelay);  
+  Serial.print(noiseFrequencyDelay);
 #endif
 }
 
 
+// TODO: this isn't really power - when turning back 'on' need to go through the ethernet startup cycle again
 void onPower(OSCMessage *_mes){
   isOn = (_mes->getArgInt32(0) == 1) ? true : false;
-  for(int i = 0; i < lightCount; i++)  {
+  for(int i = 0; i < NUM_LEDS; i++)  {
     if(!isOn) {
       // switch all lights off- to black
       saturation = 0;
       brightness = 0;
       hues[i] = 0;
-      ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
-      ColorUtils::setHsb(currentLedRGB[i], hues[i], saturation, brightness);
-    } 
+      ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
+      ColorUtils::setHSB(currentLedRGB[i], hues[i], saturation, brightness);
+    }
     else {
       // switch all lights on- to white
       hues[i] = 255;
       saturation = 255;
       brightness = 255;
-      ColorUtils::setHsb(newLedRGB[i], hues[i], saturation, brightness);
+      ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
     }
 
   }
@@ -590,42 +593,5 @@ void onPower(OSCMessage *_mes){
 }
 
 #endif
-
-
-
-// old method for updateing all leds to same color
-/*void checkLeds() {
- 
- // rgb lerp
- if(lerpAmount < 1) lerpAmount += lerpInc;
- ColorUtils::lerpRGB(currentRGB, newRGB, lerpAmount);
- uint32_t hexForLed =  ColorUtils::rgbToHex(currentRGB.r,currentRGB.g,currentRGB.b);
- 
- // light up led
- for(int i = 0; i < lightCount; i++)  {
- for(byte color_bit = 23 ; color_bit != 255 ; color_bit--) {
- //Feed color bit 23 first (red data MSB)
- digitalWrite(CKI, LOW); //Only change data when clock is low
- mask = 1L << color_bit;
- //The 1'L' forces the 1 to start as a 32 bit number, otherwise it defaults to 16-bit.
- if(hexForLed & mask) {
- digitalWrite(SDI, HIGH);
- } 
- else {
- digitalWrite(SDI, LOW);
- }
- 
- digitalWrite(CKI, HIGH); //Data is latched when clock goes high
- }
- }
- 
- //Pull clock low to put strip into reset/post mode
- digitalWrite(CKI, LOW);
- //delayMicroseconds(500); //Wait for 500us to go into reset
- }*/
-
-
-
-
 
 
