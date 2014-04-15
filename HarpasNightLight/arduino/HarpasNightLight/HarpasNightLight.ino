@@ -3,7 +3,7 @@
 // comment/uncomment these to test memory footprints
 #define USE_SERIAL_PRINT
 #define USE_ETHERNET
-//#define USE_BONJOUR // cannot have bonjour without ethernet
+#define USE_BONJOUR // cannot have bonjour without ethernet
 #define USE_OSC
 
 #ifdef USE_ETHERNET
@@ -72,7 +72,7 @@ float lerpAmount = 0;
 int fadeDelayTime=5000;
 long previousMillis = 0;
 boolean changeColor = false;
-int mode = 2; // 0 = auto change, 1 = manual, 2 = sound/mic
+int mode = 0; // 0 = auto change, 1 = manual, 2 = sound/mic
 
 // NETWORK/OSC: some settings can be changed via osc (eg. from iphone). make sure correct ip is used on phone if no bonjour.
 int ethernetConnected = 0;
@@ -82,8 +82,8 @@ const int OSC_PORT = 5556;
 OSCServer oscServer;
 #endif
 #ifdef USE_BONJOUR
-const int BONJOUR_PORT = 7777;
-const String BONJOUR_SERVICE = "Arduino._ofxBonjourIp";
+uint16_t BONJOUR_PORT = 7777;
+const char* BONJOUR_SERVICE = "Arduino._ofxBonjourIp";
 #endif
 
 
@@ -206,7 +206,8 @@ void loop() {
         ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
       }*/
     }
-
+    
+    Serial.println("HI");
     hasEthernetBlinked = true;
   }
 
@@ -361,8 +362,9 @@ void autoRandomiseColor() {
     previousMillis = currentMillis;
     lerpAmount = 0;
     //ColorUtils::setHSB(newRGB, hue, saturation, brightness);
+    int randomHue = random(0,255);
     for(int i = 0; i < activeLeds; i++)  {
-      hues[i] = random(0,255);
+      hues[i] = randomHue;
       ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
     }
   }
