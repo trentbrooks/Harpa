@@ -23,7 +23,7 @@
 
 // -------
 // POWER
-boolean isOn = true;
+//boolean isOn = true;
 
 
 // TIMER
@@ -72,7 +72,7 @@ float lerpAmount = 0;
 int fadeDelayTime=5000;
 long previousMillis = 0;
 boolean changeColor = false;
-int mode = 0; // 0 = auto change, 1 = manual, 2 = sound/mic
+int mode = 0; // 0 = normal/manual, 1 = auto fade/change, 2 = sound reactive/mic
 
 // NETWORK/OSC: some settings can be changed via osc (eg. from iphone). make sure correct ip is used on phone if no bonjour.
 int ethernetConnected = 0;
@@ -82,8 +82,8 @@ const int OSC_PORT = 5556;
 OSCServer oscServer;
 #endif
 #ifdef USE_BONJOUR
-uint16_t BONJOUR_PORT = 7777;
-const char* BONJOUR_SERVICE = "Arduino._ofxBonjourIp";
+const int BONJOUR_PORT = 7777;
+const char BONJOUR_SERVICE[] = "Arduino._ofxBonjourIp";
 #endif
 
 
@@ -137,7 +137,8 @@ void setup() {
   oscServer.addCallback("/hue",&onHue);
   oscServer.addCallback("/brightness",&onBrightness);
   oscServer.addCallback("/saturation",&onSaturation);
-  oscServer.addCallback("/leds",&onLedCount); // NEW
+  oscServer.addCallback("/numleds",&onLedCount); // NEW
+  oscServer.addCallback("/leds",&onLeds); // NEW
   oscServer.addCallback("/fadedelay",&onFadeDelay); // NEW  
   oscServer.addCallback("/mode",&onMode);
   oscServer.addCallback("/microphone",&onMicrophone);
@@ -145,6 +146,7 @@ void setup() {
   oscServer.addCallback("/micdiff", &onMicDifferenceScale); // NEW
   oscServer.addCallback("/speaker",&onSpeaker);
   oscServer.addCallback("/noisefrequency",&onNoiseFrequency);
+
 #endif
 
   // inputs + outputs
@@ -223,7 +225,7 @@ void loop() {
 
   // if not powered don't do anything else
   // TODO: make sure everything is turned off first
-  if(!isOn) return;
+  //if(!isOn) return;
 
   // using timers instead of normal loop for...
   // 1. updateLeds()
@@ -235,11 +237,11 @@ void loop() {
 void onTimerUpdate(void *context) {
 
   if(mode == 0) {
-    // automatic mode change colours based on a timer
-    autoRandomiseColor();
+    // manually change lights via osc
   }
   else if(mode == 1) {
-    // manually change lights via osc
+    // automatic mode change colours based on a timer
+    autoRandomiseColor();
   }
   else if(mode == 2) {
     // change lights based on sound input
@@ -566,9 +568,30 @@ void onNoiseFrequency(OSCMessage *_mes){
 #endif
 }
 
-
+void onLeds(OSCMessage *_mes) {
+  
+  boolean ledsOn = (_mes->getArgInt32(0) == 1) ? true : false;
+  for(int i = 0; i < NUM_LEDS; i++)  {
+    if(ledsOn) {
+      saturation = 255;
+      brightness = 255; // should check if this is too bright
+      ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
+      ColorUtils::setHSB(currentLedRGB[i], hues[i], saturation, brightness);
+    } else {
+      saturation = 255;
+      brightness = 0;
+      ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
+      ColorUtils::setHSB(currentLedRGB[i], hues[i], saturation, brightness);
+    }
+  }
+  #ifdef USE_SERIAL_PRINT
+  Serial.print("\nLEDS changed: ");
+  Serial.print(ledsOn);
+#endif
+}
+  
 // TODO: this isn't really power - when turning back 'on' need to go through the ethernet startup cycle again
-void onPower(OSCMessage *_mes){
+/*void onPower(OSCMessage *_mes){
   isOn = (_mes->getArgInt32(0) == 1) ? true : false;
   for(int i = 0; i < NUM_LEDS; i++)  {
     if(!isOn) {
@@ -592,7 +615,7 @@ void onPower(OSCMessage *_mes){
   Serial.print("\nPower changed: ");
   Serial.print(isOn);
 #endif
-}
+}*/
 
 #endif
 

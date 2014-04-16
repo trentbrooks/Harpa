@@ -3,3 +3,5 @@ ofxOsc
 ofxTouchGUI
 ofxXmlSettings
 ofxBonjourIp
+ofxiOSBridgeUtils
+ofxUtils

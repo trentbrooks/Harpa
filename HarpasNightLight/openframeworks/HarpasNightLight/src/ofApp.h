@@ -9,7 +9,10 @@
 #include "DisplayLayer.h"
 #include "ResourceManager.h"
 #include "MainButton.h"
-
+#include "TimerUtils.h"
+//#include "AlertViewDelegate.h"
+#include "ofxiOSBridgeUtils.h"
+//#include "ofxLabelView.h"
 
 class ofApp : public ofxiOSApp {
 	
@@ -33,7 +36,13 @@ class ofApp : public ofxiOSApp {
     // settings
     ofxTouchGUI settings;
     ofxTouchGUITextInput* inputField;
-    void onGuiChanged(const void* sender, string &buttonLabel);
+    void onGUIChanged(ofxTouchGUIEventArgs & args);//const void* sender, string &buttonLabel);
+    bool doubleTapActivatedMenu;
+    
+    // images
+    ofTexture* wrenchIcon;
+    ofTexture* notConnectedIcon;
+    bool showNotConnectedIcon;
     
     // connect to arduino via bonjour instead of ip
     ofxBonjourIp bonjour;
@@ -41,7 +50,22 @@ class ofApp : public ofxiOSApp {
     void onDiscoveredService(const void* sender, string &serviceIp);
     void onRemovedService(const void* sender, string &serviceIp);
     bool ignoreBonjour;
+    void beginBonjour();
+    CallbackTimer bonjourErrorTimer;
+    void onBonjourTimeout();
+    bool isConnectedViaBonjour;
     
+    
+    // alerts
+    //AlertViewDelegate* alertView;
+    void onAlertClosed(ofAlertViewEventArgs& args);//const void* sender, int &buttonId);
+    ofxAlertView* alertView;
+    ofxLabelView* labelView;
+    ofxActivityIndicator* activityIndicatorView;
+    
+    MultiTween tween;
+    void onSettingsHide();
+    void onSettingsShow();
     
     // night light settings
     bool isPowerOn;
@@ -52,10 +76,16 @@ class ofApp : public ofxiOSApp {
     int saturation;
     int hue1, hue2, hue3, hue4;
     int colourMode;
+    float noiseFrequency;
+    int micSamples;
+    float micDifference;
+    int fadeDelayMillis;
+    int numLeds;
     
     // osc
     string host;
     int port;
+    string arduinoIpAndPort;
     
     ofImage img;
     
@@ -66,7 +96,7 @@ class ofApp : public ofxiOSApp {
     vector<ofxPixelsMovieClip*> animations;
     
     vector<MainButton*> mainButtons;
-    void onMainButtonPressed(const void* sender, int &buttonId);
+    void onMainButtonPressed(DisplayLayerEventArgs& args);//const void* sender, int &buttonId);
 };
 
 

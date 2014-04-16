@@ -39,6 +39,8 @@ public:
     
     bool isUpImage;
     ofTexture* downImage;
+    ofTexture* customImage;
+    bool hasCustomImage;
     
     bool blendImage;
     bool doBlend;
@@ -51,6 +53,7 @@ public:
         height = image->getHeight();
         downImage = ResourceManager::loadTexture(downImagePath);
         hasImage = true;
+        hasCustomImage = false;
     };
     
     virtual void draw() {
@@ -75,10 +78,13 @@ public:
                     if(blendImage) {
                         ofSetColor(255,alpha);
                         downImage->draw(0,0,width,height);
-                    }
+                    }                    
                     if(doBlend) ofDisableBlendMode();
                     ofEnableAlphaBlending();
+                    
+                    
                     ofSetColor(255,alpha);
+                    if(hasCustomImage) customImage->draw(0,0,width,height);
                     if(!blendImage)downImage->draw(0,0,width,height);
                 }
             } else {
