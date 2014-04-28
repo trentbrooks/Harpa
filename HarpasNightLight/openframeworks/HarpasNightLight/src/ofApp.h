@@ -72,8 +72,8 @@ class ofApp : public ofxiOSApp {
     bool isMicrophoneEnabled;
     bool isSpeakerEnabled;
     int hueAll;
-    int brightness;
-    int saturation;
+    int brightness, defaultBrightness;
+    int saturation, defaultSaturation;
     int hue1, hue2, hue3, hue4;
     int colourMode;
     float noiseFrequency;

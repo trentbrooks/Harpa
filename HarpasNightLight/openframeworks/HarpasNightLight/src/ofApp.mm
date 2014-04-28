@@ -26,18 +26,14 @@ void ofApp::setup(){
     ofBackground(230);    
     ofSetOrientation(OF_ORIENTATION_90_LEFT);
     
-    ofAppiOSWindow* window = (ofAppiOSWindow*)ofGetWindowPtr();
-//    window->enableHardwareOrientation();
-//    bool doesHWOrientation = ofGetWindowPtr()->doesHWOrientation();
-//    ofLog() << "does hw rot: " << doesHWOrientation;
     
     // defaults
     isPowerOn = true;
     isMicrophoneEnabled = false;
     isSpeakerEnabled = false;
     hueAll = 60; // yewllow
-    brightness = 255;
-    saturation = 255;
+    brightness = defaultBrightness = 255;
+    saturation = defaultSaturation = 255;
     hue1 = hue2 = hue3 = hue4 = hueAll;
     colourMode = 0;
     noiseFrequency = 0.05;
@@ -52,9 +48,7 @@ void ofApp::setup(){
     showNotConnectedIcon = true;
     
     
-    string colourModeOptions[] = {"NORMAL", "AUTO FADE", "SOUND REACTIVE"};
-    //string description = "ofxTouchGUI includes slider, dropdown list, button/image button, toggle button, text/title fields, input text (ios only atm), and general fixed variables. All items are custom positioned/sized on creation. Colours, fonts, etc can be changed. Settings can be saved to XML. Values can be sent via OSC.";
-    
+    string colourModeOptions[] = {"NORMAL", "AUTO FADE", "RAINBOW", "SOUND REACTIVE"};
     
     // discover arduino IP via bonjour
     //bonjour.discoverService();
@@ -65,22 +59,7 @@ void ofApp::setup(){
     // add a little spinning icon thingy in the middle
     activityIndicatorView = new ofxActivityIndicator();
     //activityIndicatorView->add(true, ofColor(255,255,0));
-    /*busyAnimation = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
-    busyAnimation.frame = CGRectMake(0, 0, ofGetWidth(), ofGetHeight());
-    if(!ignoreBonjour) {
-        [busyAnimation startAnimating];
-        [ofxiPhoneGetGLParentView() addSubview:busyAnimation];
-    }*/
     
-    //- (id)initWithTitle:(NSString *)title message:(NSString *)message delegate:(id /*<UIAlertViewDelegate>*/)delegate cancelButtonTitle:(NSString *)cancelButtonTitle otherButtonTitles:(NSString *)otherButtonTitles, ... NS_REQUIRES_NIL_TERMINATION;
-    //alertBox = [[UIAlertView alloc] initWithTitle:@"Could not find Harpa's Night Light" delegate:nil message:@"Try entering IP address manually" cancelButtonTitle:@"Cancel" otherButtonTitles:nil];
-    //[alertBox addButtonWithTitle:@"Preferred Mode"];
-    //[alertBox show];
-    /*UIAlertView * alert = [[[UIAlertView alloc] initWithTitle:@"External Display"
-                                                      message:@"Select a External Display Mode"
-                                                     delegate:alertViewDelegate
-                                            cancelButtonTitle:@"Cancel"
-                                            otherButtonTitles:nil] retain];*/
     
     // icon image in top left corner
     //wrenchIcon = ResourceManager::loadTexture("ui/settings-up.png");
@@ -96,18 +75,6 @@ void ofApp::setup(){
     //settings.setupReceiveOSC(5555); // optional (receives from desktop machine running ofxTouchGUIExample)
     settings.setBackgroundColor(ofColor(20,230),0,0,ofGetWidth(),ofGetHeight());
     
-    /*int buttonSize = 268;
-    int halfButtonSize = buttonSize*.5;
-    int yOffset = -250;
-    
-    settings.moveTo(ofGetWidth()*.5 -(buttonSize+halfButtonSize), ofGetHeight()*.5 +yOffset);
-    settings.addToggleButton("POWER", &isPowerOn)->loadImageStates("ui/lights-off.png", "ui/lights-on3.png");
-    settings.moveTo(ofGetWidth()*.5 -halfButtonSize, ofGetHeight()*.5 +yOffset);
-    settings.addToggleButton("MICROPHONE", &isMicrophoneEnabled)->loadImageStates("ui/mic-off.png", "ui/mic-on3.png");
-    settings.moveTo(ofGetWidth()*.5 +halfButtonSize, ofGetHeight()*.5 +yOffset);
-    settings.addToggleButton("SPEAKER", &isSpeakerEnabled)->loadImageStates("ui/speaker-off.png", "ui/speaker-on3.png");
-    */
-    
     int itemWidth = 300;
     int itemHeight = 36;
     settings.setItemSize(itemWidth, itemHeight);
@@ -115,33 +82,6 @@ void ofApp::setup(){
     //settings.setWindowPosition(ofGetWidth()-settings.getItemWidth()-40, 0);
     //settings.setScrollable(true); // optional - new columns will not be auto created, all items add to a single column instead.
     
-
-    /*
-     void setTextClr(ofColor clr);
-     void setBackgroundClrs(ofColor singleClr);
-     void setBackgroundClrs(ofColor tl, ofColor tr, ofColor bl, ofColor br);
-     void setActiveClrs(ofColor singleClr);
-     void setActiveClrs(ofColor tl, ofColor tr, ofColor bl, ofColor br);
-     */
-    
-    // add controls
-    //settings.addTitleText("SETTINGS");
-    //settings.moveTo(40, 460);
-    //settings.addToggleButton("POWER", &isPowerOn);
-    //settings.addToggleButton("MICROPHONE", &isMicrophoneEnabled);
-    //settings.addToggleButton("SPEAKER", &isSpeakerEnabled);
-    //settings.disableTouch(); // use mouse style events
-    
-    // keyboard input needs special placement, affected by retina, hardware orientation, etc
-    float retinaScale = 0.5;//(window->isRetinaEnabled()) ? 1.0 : 0.5;//0.5: 1.0;
-    ofVec2f lastPos = settings.getItemPosition() * retinaScale;
-    ofVec2f windowPos = settings.getWindowPosition() * retinaScale;
-    int lastItemWidth = itemWidth * retinaScale;
-    int lastItemHeight = itemHeight * retinaScale;
-    //settings.moveTo(lastPos.x/2, lastPos.y/2);
-    //inputField = settings.addTextInput(&host, windowPos.x + lastPos.x, windowPos.y + lastPos.y + lastItemHeight + 5, lastItemWidth, lastItemHeight);
-    //settings.moveTo(30, 440);
-    settings.addVarText("OSC", &arduinoIpAndPort);//->setTextOffsets(0, 8);
     //settings.addVarText("ARDUINO IP", &host)->setTextOffsets(0, 8);
     //settings.addVarText("OSC SEND PORT", &port)->setTextOffsets(0, 8);
     ofColor textClr(20,20,20);
@@ -151,20 +91,16 @@ void ofApp::setup(){
     ofColor pink2(150,0,90);
     ofColor cyan1(0,255,255);
     ofColor cyan2(0,190,190);
-    ofxTouchGUIButton* b1 = settings.addButton("BONJOUR ARDUINO");
-    b1->setBackgroundClrs(yellow1,yellow1, yellow2, yellow2);//cyan1,cyan1,cyan2,cyan2);//pink1,pink1,pink2,pink2);
-    b1->setActiveClrs(pink1,pink1,pink2,pink2);
-    b1->setTextClr(textClr);
-    settings.addButton("ENTER ARDUINO IP")->copyStyle(b1);
 
+    
     settings.addText("MICROPHONE:");
-    ofxTouchGUIToggleButton* micToggle = settings.addToggleButton("MIC ON", &isMicrophoneEnabled);
-    micToggle->setBackgroundClrs(yellow2, yellow1, yellow2, yellow1);
-    micToggle->setActiveClrs(cyan2);
-    micToggle->setTextClr(textClr);
-    micToggle->crossX = textClr;
-    micToggle->crossLineWidth = 2;
-    micToggle->setOSCAddress("/microphone");
+    /*ofxTouchGUIToggleButton* micToggle = settings.addToggleButton("MIC ON", &isMicrophoneEnabled);
+     micToggle->setBackgroundClrs(yellow2, yellow1, yellow2, yellow1);
+     micToggle->setActiveClrs(cyan2);
+     micToggle->setTextClr(textClr);
+     micToggle->crossX = textClr;
+     micToggle->crossLineWidth = 2;
+     micToggle->setOSCAddress("/microphone");*/
     ofxTouchGUISlider* micSlider = settings.addSlider("MIC SAMPLES", &micSamples, 1, 120);
     micSlider->setBackgroundClrs(cyan2,cyan1,cyan2,cyan1);
     micSlider->setActiveClrs(pink1);//ofColor(255,255,0));
@@ -175,31 +111,21 @@ void ofApp::setup(){
     
     settings.addText("SPEAKER:");//->setTextOffsets(0, 2);
     ofxTouchGUIToggleButton* tsb = settings.addToggleButton("SPEAKER ON", &isSpeakerEnabled);
-    tsb->copyStyle(micToggle);
+    tsb->setBackgroundClrs(yellow2, yellow1, yellow2, yellow1);
+    tsb->setActiveClrs(cyan2);
+    tsb->setTextClr(textClr);
+    tsb->crossX = textClr;
+    tsb->crossLineWidth = 2;
     tsb->setOSCAddress("/speaker");
-    //ofVec2f soundTitlePos = settings.getItemPosition();
-    //settings.moveTo(soundTitlePos.x, soundTitlePos.y + settings.getItemHeight()+8);
     settings.addSlider("NOISE FREQUENCY", &noiseFrequency, 0, 0.2)->copyStyle(micSlider);
-
     
     
     
-    //oscServer.addCallback("/micsamples", &onMicSamples); // NEW
-    //oscServer.addCallback("/micdiff", &onMicDifferenceScale); // NEW
-    
-    //settings.moveTo(360, 440);
-    settings.nextColumn();
     settings.addText("LEDS:");//->setTextOffsets(0, 2);
-    //settings.moveTo(360, 486);
-    ofxTouchGUIToggleButton* tb = settings.addToggleButton("LEDS ON", &isPowerOn);
-    tb->copyStyle(micToggle);
-    tb->setOSCAddress("/leds");
-    ofxTouchGUIDropDown* d1 = settings.addDropDown("COLOUR MODE", 3, &colourMode, colourModeOptions);
-    d1->setActiveClrs(pink1);//pink1,pink1,pink2,pink2);
-    d1->setBackgroundClrs(cyan1,cyan1,cyan2,cyan2);
-    d1->setTextClr(textClr);
-    d1->setArrowClr(textClr);
-    d1->setOSCAddress("/mode");
+    //ofxTouchGUIToggleButton* tb = settings.addToggleButton("LEDS ON", &isPowerOn);
+    //tb->copyStyle(micToggle);
+    //tb->setOSCAddress("/leds");
+    
     
     ofTexture* hueSliderImage = ResourceManager::loadTexture("ui/slider-bg2.png");
     ofTexture* hueSliderBall = ResourceManager::loadTexture("ui/slider-fg2.png");
@@ -209,9 +135,31 @@ void ofApp::setup(){
     settings.addSlider("BRIGHTNESS", &brightness, 0, 255)->copyStyle(micSlider);
     settings.addSlider("SATURATION", &saturation, 0, 255)->copyStyle(micSlider);
     settings.addSlider("FADE DELAY", &fadeDelayMillis, 0, 20000)->copyStyle(micSlider);
-    ofxTouchGUISlider* ls= settings.addSlider("LED COUNT", &numLeds, 0, 40);
+    ofxTouchGUISlider* ls= settings.addSlider("LED COUNT", &numLeds, 0, 30);
     ls->copyStyle(micSlider);
     ls->setOSCAddress("/numleds");
+    
+
+
+    
+
+    
+
+    settings.nextColumn();
+    settings.addVarText("OSC", &arduinoIpAndPort);//->setTextOffsets(0, 8);
+    ofxTouchGUIButton* b1 = settings.addButton("BONJOUR ARDUINO");
+    b1->setBackgroundClrs(yellow1,yellow1, yellow2, yellow2);//cyan1,cyan1,cyan2,cyan2);//pink1,pink1,pink2,pink2);
+    b1->setActiveClrs(pink1,pink1,pink2,pink2);
+    b1->setTextClr(textClr);
+    settings.addButton("ENTER ARDUINO IP")->copyStyle(b1);
+    
+    settings.addText("MODE:");
+    ofxTouchGUIDropDown* d1 = settings.addDropDown("COLOUR MODE", 4, &colourMode, colourModeOptions);
+    d1->setActiveClrs(pink1);//pink1,pink1,pink2,pink2);
+    d1->setBackgroundClrs(cyan1,cyan1,cyan2,cyan2);
+    d1->setTextClr(textClr);
+    d1->setArrowClr(textClr);
+    d1->setOSCAddress("/mode");
     
     
     ofImage* closeImage = ResourceManager::loadImage("ui/closeBtn.png");
@@ -302,7 +250,7 @@ void ofApp::setup(){
     mainButtons[1]->loadSound("sound2/yellow.aiff");
     mainButtons[2]->loadImageStates("ui/label-empty.png", "ui/label-pink.png");
     mainButtons[2]->blendColor = ofColor(255,23,158);
-    mainButtons[2]->setOSCProperties("/hue", ofColor(255,127,0));
+    mainButtons[2]->setOSCProperties("/hue", ofColor(255,0,127));
     mainButtons[2]->loadSound("sound2/pink.aiff");
     mainButtons[3]->loadImageStates("ui/label-empty.png", "ui/label-blue.png");
     mainButtons[3]->blendColor = ofColor(0,187,235);
@@ -314,7 +262,8 @@ void ofApp::setup(){
     //mainButtons[4]->doBlend = false;
     //mainButtons[4]->blendColor = ofColor(255,0);
     mainButtons[4]->blendImage = true;
-    mainButtons[4]->setOSCProperties("/hue", ofColor(255)); // need to change this
+    //mainButtons[4]->setOSCProperties("/hue", ofColor(255)); // need to change this
+    mainButtons[4]->setOSCProperties("/mode", 2); // rainbow mode!
     mainButtons[4]->loadSound("sound2/rainbow.aiff");
     mainButtons[5]->loadImageStates("ui/label-empty.png", "ui/label-green.png");
     mainButtons[5]->blendColor = ofColor(130,252,0);
@@ -502,20 +451,44 @@ void ofApp::onMainButtonPressed(DisplayLayerEventArgs& args) {
     if(!mainButtons[buttonId]->isUpImage) {
         animations[buttonId]->play();
         mainButtons[buttonId]->sound.play();
-        // send osc
-        // hue
-        //ofLog() << "sending something? " << buttonId << ", " << mainButtons[buttonId]->oscAddress << ", " << mainButtons[buttonId]->oscVal;
-        settings.sendOSC(mainButtons[buttonId]->oscAddress, mainButtons[buttonId]->oscVal);
+
         
         // saturation + brightness for white + black
         // already sends brightness, but need to send saturation as well
         if(buttonId == 0) {
+            
             // if white - send brightness 255 + saturation 0
-            settings.sendOSC("/saturation", 0);
+            brightness = mainButtons[buttonId]->oscVal;
+            saturation = 0;
+            settings.sendOSC("/saturation", saturation);
         } else if(buttonId == 8) {
+            
             // if black - send brightness 0+ saturation 255
-            settings.sendOSC("/saturation", 255);
+            brightness = mainButtons[buttonId]->oscVal;
+            saturation = 255;
+            settings.sendOSC("/saturation", saturation);
+        } else {
+            
+            // if saturation is 0 or brightness is 0 when changing hue, it won;t work properly
+            // eg. if last selected was white or black
+            if(saturation == 0) {
+                saturation = defaultSaturation;
+                settings.sendOSC("/saturation", saturation);
+            }
+            if(brightness == 0) {
+                brightness = defaultBrightness;
+                settings.sendOSC("/brightness", brightness);
+            }
         }
+        
+        // if not the rainbow- set to normal mode
+        if(buttonId != 4) {
+            colourMode = 0;
+            settings.sendOSC("/mode", colourMode);
+        }
+        
+        // send normal osc message (hue for normal colors, brightness for white/back, mode for raindbow)
+        settings.sendOSC(mainButtons[buttonId]->oscAddress, mainButtons[buttonId]->oscVal);
         
         
         
@@ -619,7 +592,7 @@ void ofApp::onDiscoveredService(const void* sender, string &serviceIp) {
         ofLog() << "Changed OSC host address: " << host;
         settings.setupSendOSC(host, port);
     }
-    inputField->setPlaceHolderText(host);
+    //inputField->setPlaceHolderText(host);
     
     //settings.showPanel(0);
     //settings.show();

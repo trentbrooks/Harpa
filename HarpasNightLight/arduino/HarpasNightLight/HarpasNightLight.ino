@@ -1,7 +1,7 @@
 
 
 // comment/uncomment these to test memory footprints
-#define USE_SERIAL_PRINT
+//#define USE_SERIAL_PRINT
 #define USE_ETHERNET
 #define USE_BONJOUR // cannot have bonjour without ethernet
 #define USE_OSC
@@ -35,14 +35,14 @@ int8_t speakerTimerId;
 // detected - it waits a certain amount (eg. 15 seconds) of time before resetting.
 const int MIC_PIN = A1;   // the SPL output is connected to analog pin 0
 boolean useMic = false;
-const int MAX_MIC_SAMPLES = 120;
-int micReadCount = MAX_MIC_SAMPLES; // max number of samples for average
+const int MAX_MIC_SAMPLES = 120;//120;
+int micReadCount = 15; // max number of samples for average
 int micValues[MAX_MIC_SAMPLES]; // same number of samples
-float differenceScale = 0.5; // how different the read needs to be from the average (0.0 = same, 1.0 = opposite/very different)
+float differenceScale = 0.2;//0.5; // how different the read needs to be from the average (0.0 = same, 1.0 = opposite/very different)
 int micSum = 0; // sound levels total
 int micPos = 0; // array index
 int soundResetCount = 0;
-int soundResetTimeLimit = 30;
+int soundResetTimeLimit = 5;//30;
 boolean soundChanged = false;
 boolean fadeOnSound = false;
 int soundLevel = 0; // mic level
@@ -71,8 +71,8 @@ float lerpInc = 0.0025;//025;//5;
 float lerpAmount = 0;
 int fadeDelayTime=5000;
 long previousMillis = 0;
-boolean changeColor = false;
-int mode = 0; // 0 = normal/manual, 1 = auto fade/change, 2 = sound reactive/mic
+uint16_t rainbowCycleIndex = 0;
+int mode = 2; // 0 = normal/manual, 1 = auto fade/change, 2 = rainbow, 3 = sound reactive/mic
 
 // NETWORK/OSC: some settings can be changed via osc (eg. from iphone). make sure correct ip is used on phone if no bonjour.
 int ethernetConnected = 0;
@@ -189,7 +189,8 @@ void loop() {
 
       // all lights are green - we are connected
       Color green = {0,255,0};
-      colorWipe(green, 50);
+      //colorWipe(green, 50);
+      theaterChase(green, 50);
 
       /*lerpAmount = 0.0;
       for(int i = 0; i < NUM_LEDS; i++)  {
@@ -200,7 +201,8 @@ void loop() {
 
       // all lights are red
       Color red = {255,0,0};
-      colorWipe(red, 50);
+      //colorWipe(red, 50);
+      theaterChase(red, 50);
 
       /*lerpAmount = 0.0;
       for(int i = 0; i < NUM_LEDS; i++)  {
@@ -209,7 +211,6 @@ void loop() {
       }*/
     }
     
-    Serial.println("HI");
     hasEthernetBlinked = true;
   }
 
@@ -236,20 +237,26 @@ void loop() {
 
 void onTimerUpdate(void *context) {
 
+  // 0 = normal/manual, 1 = auto fade/change, 2 = rainbow, 3 = sound reactive/mic
   if(mode == 0) {
     // manually change lights via osc
+    updateLeds();
   }
   else if(mode == 1) {
     // automatic mode change colours based on a timer
     autoRandomiseColor();
+    updateLeds();
   }
   else if(mode == 2) {
+    // rainbow cycle
+    rainbowCycleColor();
+  }
+  else if(mode == 3) {
     // change lights based on sound input
     updateMic();
+    updateLeds();
   }
 
-  //checkLeds();
-  updateLeds();
 }
 
 // ------- MIC
@@ -281,17 +288,18 @@ void updateMic() {
      }*/
 
     // 2) sound could change the colour of the leds instead of turning led on/off
-    if(!soundChanged) {
+    //if(!soundChanged) {
       if(diff > differenceScale) {
         soundChanged = true;
         lerpAmount = 0;
+        int randomHue = random(0,255);
         for(int i = 0; i < activeLeds; i++)  {
-          hues[i] = random(0,255);
+          hues[i] = randomHue;
           ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
         }
       }
-    }
-    else {
+    //}
+    /*else {
       // reset after threshold
       soundResetCount++;
       if(soundResetCount > soundResetTimeLimit) {
@@ -299,7 +307,7 @@ void updateMic() {
         soundResetCount = 0;
         //Serial.println("  time reset");
       }
-    }
+    }*/
   }
 }
 
@@ -325,6 +333,7 @@ void updateSpeaker() {
 }
 
 void generateNoise(){
+
   unsigned long int newr;
   unsigned char lobit;
   unsigned char b31, b29, b25, b24;
@@ -372,11 +381,36 @@ void autoRandomiseColor() {
   }
 }
 
+
+
+void rainbowCycleColor() {
+  uint16_t i;
+  //Color c;
+
+  for(i=0; i<NUM_LEDS; i++) {
+      
+      //strip.setPixelColor(i, Wheel((i+j) & 255));
+      //i * 256 / strip.numPixels()
+      //wheel(c, (i+rainbowIndex) & 255); // wrong!
+      int hue = ((i * 256) / NUM_LEDS +rainbowCycleIndex) & 255;
+      //int hue = (i+rainbowCycleIndex) & 255;
+      //wheel(c, ((i * 256) / NUM_LEDS +rainbowIndex) & 255);
+      //ColorUtils::setRGB(newLedRGB[i], c.r, c.g, c.b);
+      //ColorUtils::setRGB(currentLedRGB[i], c.r, c.g, c.b);
+      ColorUtils::setHSB(newLedRGB[i], hue, saturation, brightness);
+      strip.setPixelColor(i, newLedRGB[i].r, newLedRGB[i].g, newLedRGB[i].b);
+      //strip.setPixelColor(i, Wheel((i+j) & 255));
+  }
+  strip.show();
+    
+  if (++rainbowCycleIndex == 255) rainbowCycleIndex = 0;
+}
+
 // Adafruit example animations (modified to use Color struct)
 // note - these rely on delays
 // for compatibility with own color tweeening library, also set my arrays to same as adafruit lib
 // Fill the dots one after the other with a color
-void colorWipe(Color c, uint8_t wait) {
+void colorWipe(Color& c, uint8_t wait) {
 
   // no need to lerp colors, due to delays
   lerpAmount = 1.0;
@@ -392,12 +426,12 @@ void colorWipe(Color c, uint8_t wait) {
 }
 
 // Theatre-style crawling lights.
-void theaterChase(Color c, uint8_t wait) {
+void theaterChase(Color& c, uint8_t wait) {
 
   // no need to lerp colors, due to delays
   lerpAmount = 1.0;
 
-  for (int j=0; j<10; j++) {  //do 10 cycles of chasing
+  for (int j=0; j<30; j++) {  //do 10 cycles of chasing
     for (int q=0; q < 3; q++) {
       for (int i=0; i < strip.numPixels(); i=i+3) {
         ColorUtils::setRGB(newLedRGB[i+q], c.r, c.g, c.b);
@@ -418,14 +452,14 @@ void theaterChase(Color c, uint8_t wait) {
 
 // copying adafruit rainbow stuff to use Color struct
 void rainbow(uint8_t wait) {
-
   uint16_t i, j;
   Color c;
 
   for(j=0; j<256; j++) {
     for(i=0; i<strip.numPixels(); i++) {
-
-      wheel(c, i);
+      
+      //strip.setPixelColor(i, Wheel((i+j) & 255));
+      wheel(c, i); // wrong!
       ColorUtils::setRGB(newLedRGB[i], c.r, c.g, c.b);
       ColorUtils::setRGB(currentLedRGB[i], c.r, c.g, c.b);
       strip.setPixelColor(i, c.r, c.g, c.b);
@@ -436,7 +470,21 @@ void rainbow(uint8_t wait) {
   }
 }
 
-void wheel(Color clr, byte WheelPos) {
+// Slightly different, this makes the rainbow equally distributed throughout
+/*void rainbowCycle(uint8_t wait) {
+  uint16_t i, j;
+  //Color c;
+
+  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
+    for(i=0; i< strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
+    }
+    strip.show();
+    delay(wait);
+  }
+}*/
+
+void wheel(Color& clr, byte WheelPos) {
 
   if(WheelPos < 85) {
    ColorUtils::setRGB(clr, WheelPos * 3, 255 - WheelPos * 3, 0);
@@ -448,6 +496,7 @@ void wheel(Color clr, byte WheelPos) {
    ColorUtils::setRGB(clr, 0, WheelPos * 3, 255 - WheelPos * 3);
   }
 }
+
 
 
 // ------- OSC events
@@ -518,6 +567,17 @@ void onFadeDelay(OSCMessage *_mes) {
 
 void onMode(OSCMessage *_mes){
   mode = _mes->getArgInt32(0);
+  if(mode == 3) {
+    useMic = true;
+    int hue = 220; // everything goes pink
+    //ColorUtils::setHSB(newRGB, hue, saturation, brightness);
+    for(int i = 0; i < activeLeds; i++)  {
+      hues[i] = hue;
+      ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
+    }
+  } else {
+    useMic = false;
+  }
 #ifdef USE_SERIAL_PRINT
   Serial.print("\nMode changed: ");
   Serial.print(mode);
