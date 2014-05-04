@@ -117,7 +117,7 @@ void ofApp::setup(){
     tsb->crossX = textClr;
     tsb->crossLineWidth = 2;
     tsb->setOSCAddress("/speaker");
-    settings.addSlider("NOISE FREQUENCY", &noiseFrequency, 0, 0.2)->copyStyle(micSlider);
+    settings.addSlider("NOISE FREQUENCY", &noiseFrequency, 0, 0.5)->copyStyle(micSlider); //0.2
     
     
     
@@ -186,6 +186,7 @@ void ofApp::setup(){
     menuBtn->loadImageStates("ui/settings-up.png", "ui/settings-up.png");*/
     
     // adds a listener to all gui items, pointing to onGuiChanged();
+    settings.resetDefaultValues();
     settings.addEventListenerAllItems(this);
     settings.hide();
     
