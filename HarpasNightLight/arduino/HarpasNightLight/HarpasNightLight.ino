@@ -1,7 +1,7 @@
 
 
 // comment/uncomment these to test memory footprints
-#define USE_SERIAL_PRINT
+//#define USE_SERIAL_PRINT
 #define USE_ETHERNET
 #define USE_BONJOUR // cannot have bonjour without ethernet
 #define USE_OSC
@@ -52,7 +52,7 @@ float soundRange = 700.0f; // mic sensor range: 0 (min) - 700 (max)
 // SPEAKER: plays white noise
 const int SPEAKER_PIN = 8;
 boolean useSpeaker = false;
-float noiseFrequencyDelay = .05; // used to be 50
+float noiseFrequencyDelay = 0.05; // used to be 50
 unsigned long int reg = 0x55aa55aaL;
 
 
@@ -64,7 +64,7 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ
 Color currentLedRGB[NUM_LEDS];
 Color newLedRGB[NUM_LEDS];
 int hues[NUM_LEDS];
-int brightness = 255;
+int brightness = 75; //255;
 int saturation = 255;
 int activeLeds = NUM_LEDS;
 float lerpInc = 0.0025;//025;//5;
@@ -96,6 +96,18 @@ void setup() {
   //Serial.println("Memory: Setup begin=");
   //Serial.println(freeMemory());
 
+  // Initialize all pixels/LEDS to orange
+  strip.begin();
+  int hue = 22; //orange
+  Color clr;
+  ColorUtils::setHSB(clr, hue, saturation, brightness);
+  for(int i = 0; i < activeLeds; i++)  {
+    //hues[i] = hue;
+    strip.setPixelColor(i, clr.r, clr.g, clr.b);
+  }
+  strip.show(); // Initialize all pixels to 'off'
+  
+  
   // network
 #ifdef USE_ETHERNET
   byte myMac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
@@ -153,9 +165,7 @@ void setup() {
   pinMode(MIC_PIN, INPUT); // mic pin
   pinMode(SPEAKER_PIN, OUTPUT); // speaker pin
 
-  // Initialize all pixels/LEDS to 'off'
-  strip.begin();
-  strip.show(); // Initialize all pixels to 'off'
+  
 
   // if the internet is connected all leds start green, otherwise red
   /*for(int i = 0; i < NUM_LEDS; i++)  {
@@ -188,9 +198,12 @@ void loop() {
     if(ethernetConnected == 1) {
 
       // all lights are green - we are connected
-      Color green = {0,255,0};
-      //colorWipe(green, 50);
-      theaterChase(green, 50);
+      //Color green = {0,255,0};
+      int hue = 85; //green
+      Color clr;
+      ColorUtils::setHSB(clr, hue, saturation, brightness);
+      //colorWipe(clr, 50);
+      theaterChase(clr, 50);
 
       /*lerpAmount = 0.0;
       for(int i = 0; i < NUM_LEDS; i++)  {
@@ -200,9 +213,12 @@ void loop() {
     } else {
 
       // all lights are red
-      Color red = {255,0,0};
-      //colorWipe(red, 50);
-      theaterChase(red, 50);
+      //Color red = {255,0,0};
+      int hue = 0; //green
+      Color clr;
+      ColorUtils::setHSB(clr, hue, saturation, brightness);
+      //colorWipe(clr, 50);
+      theaterChase(clr, 50);
 
       /*lerpAmount = 0.0;
       for(int i = 0; i < NUM_LEDS; i++)  {
