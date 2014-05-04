@@ -1,7 +1,7 @@
 
 
 // comment/uncomment these to test memory footprints
-//#define USE_SERIAL_PRINT
+#define USE_SERIAL_PRINT
 #define USE_ETHERNET
 #define USE_BONJOUR // cannot have bonjour without ethernet
 #define USE_OSC
@@ -50,16 +50,16 @@ float soundRange = 700.0f; // mic sensor range: 0 (min) - 700 (max)
 
 
 // SPEAKER: plays white noise
-const int SPEAKER_PIN = 9;
-boolean useSpeaker = true;
+const int SPEAKER_PIN = 8;
+boolean useSpeaker = false;
 float noiseFrequencyDelay = .05; // used to be 50
-
+unsigned long int reg = 0x55aa55aaL;
 
 
 // RGB LEDS: fades/lerps between colours.
 // if mode = 0 (eg. every 5 seconds), or can be changed manually via osc (1) or sound detection (2).
 const int NUM_LEDS = 30;
-const int LED_PIN = 5;
+const int LED_PIN = 7;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 Color currentLedRGB[NUM_LEDS];
 Color newLedRGB[NUM_LEDS];
@@ -337,7 +337,6 @@ void generateNoise(){
   unsigned long int newr;
   unsigned char lobit;
   unsigned char b31, b29, b25, b24;
-  unsigned long int reg = 0x55aa55aaL;
   b31 = (reg & (1L << 31)) >> 31;
   b29 = (reg & (1L << 29)) >> 29;
   b25 = (reg & (1L << 25)) >> 25;
