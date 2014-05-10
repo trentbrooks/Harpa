@@ -31,14 +31,14 @@ void ofApp::setup(){
     isPowerOn = true;
     isMicrophoneEnabled = false;
     isSpeakerEnabled = false;
-    hueAll = 60; // yewllow
-    brightness = defaultBrightness = 255;
+    hueAll = 30; // orange
+    brightness = defaultBrightness = 75; //255;
     saturation = defaultSaturation = 255;
     hue1 = hue2 = hue3 = hue4 = hueAll;
     colourMode = 0;
     noiseFrequency = 0.05;
-    micSamples = 120;
-    micDifference = 0.5;
+    micSamples = 15;//120;
+    micDifference = 0.15;//0.5;
     fadeDelayMillis = 5000;
     numLeds = 30;
     port = 5556;
@@ -316,6 +316,9 @@ void ofApp::setup(){
     ofAddListener(alertView->alertClosedEvent, this, &ofApp::onAlertClosed);
     
     
+    // force orange button 'on'
+    DisplayLayerEventArgs args(mainButtons[7]);
+    onMainButtonPressed(args);
     
     /*ofxActionSheet* as = new ofxActionSheet();
      vector<string> strings;
@@ -453,43 +456,49 @@ void ofApp::onMainButtonPressed(DisplayLayerEventArgs& args) {
         animations[buttonId]->play();
         mainButtons[buttonId]->sound.play();
 
-        
-        // saturation + brightness for white + black
-        // already sends brightness, but need to send saturation as well
-        if(buttonId == 0) {
-            
-            // if white - send brightness 255 + saturation 0
-            brightness = mainButtons[buttonId]->oscVal;
-            saturation = 0;
-            settings.sendOSC("/saturation", saturation);
-        } else if(buttonId == 8) {
-            
-            // if black - send brightness 0+ saturation 255
-            brightness = mainButtons[buttonId]->oscVal;
-            saturation = 255;
-            settings.sendOSC("/saturation", saturation);
-        } else {
-            
-            // if saturation is 0 or brightness is 0 when changing hue, it won;t work properly
-            // eg. if last selected was white or black
-            if(saturation == 0) {
-                saturation = defaultSaturation;
-                settings.sendOSC("/saturation", saturation);
-            }
-            if(brightness == 0) {
-                brightness = defaultBrightness;
-                settings.sendOSC("/brightness", brightness);
-            }
-        }
-        
         // if not the rainbow- set to normal mode
         if(buttonId != 4) {
             colourMode = 0;
             settings.sendOSC("/mode", colourMode);
         }
         
-        // send normal osc message (hue for normal colors, brightness for white/back, mode for raindbow)
-        settings.sendOSC(mainButtons[buttonId]->oscAddress, mainButtons[buttonId]->oscVal);
+        // saturation + brightness for white + black
+        // already sends brightness, but need to send saturation as well
+        if(buttonId == 0) {
+            
+            // if white - send brightness 255 + saturation 0
+            brightness = defaultBrightness;//mainButtons[buttonId]->oscVal;
+            //mainButtons[buttonId]->oscVal = brightness;
+            saturation = 0;
+            settings.sendOSC("/saturation", saturation);
+            settings.sendOSC("/brightness", brightness);
+        } else if(buttonId == 8) {
+            
+            // if black - send brightness 0+ saturation 255
+            brightness = 0;//mainButtons[buttonId]->oscVal;
+            saturation = 255;
+            settings.sendOSC("/saturation", saturation);
+            settings.sendOSC("/brightness", brightness);
+        } else {
+            
+            // if saturation is 0 or brightness is 0 when changing hue, it won;t work properly
+            // eg. if last selected was white or black
+            //if(saturation == 0) {
+                saturation = defaultSaturation;
+                settings.sendOSC("/saturation", saturation);
+            //}
+            //if(brightness == 0) {
+                brightness = defaultBrightness;
+                settings.sendOSC("/brightness", brightness);
+            //}
+            
+            // send normal osc message (hue for normal colors, brightness for white/back, mode for raindbow)
+            settings.sendOSC(mainButtons[buttonId]->oscAddress, mainButtons[buttonId]->oscVal);
+        }
+        
+        
+        
+        
         
         
         

@@ -38,7 +38,7 @@ boolean useMic = false;
 const int MAX_MIC_SAMPLES = 120;//120;
 int micReadCount = 15; // max number of samples for average
 int micValues[MAX_MIC_SAMPLES]; // same number of samples
-float differenceScale = 0.2;//0.5; // how different the read needs to be from the average (0.0 = same, 1.0 = opposite/very different)
+float differenceScale = 0.15;//0.5; // how different the read needs to be from the average (0.0 = same, 1.0 = opposite/very different)
 int micSum = 0; // sound levels total
 int micPos = 0; // array index
 int soundResetCount = 0;
@@ -65,14 +65,14 @@ Color currentLedRGB[NUM_LEDS];
 Color newLedRGB[NUM_LEDS];
 int hues[NUM_LEDS];
 int brightness = 75; //255;
-int saturation = 255;
+int saturation = 0;
 int activeLeds = NUM_LEDS;
 float lerpInc = 0.0025;//025;//5;
 float lerpAmount = 0;
 int fadeDelayTime=5000;
 long previousMillis = 0;
 uint16_t rainbowCycleIndex = 0;
-int mode = 2; // 0 = normal/manual, 1 = auto fade/change, 2 = rainbow, 3 = sound reactive/mic
+int mode = 0; // 0 = normal/manual, 1 = auto fade/change, 2 = rainbow, 3 = sound reactive/mic
 
 // NETWORK/OSC: some settings can be changed via osc (eg. from iphone). make sure correct ip is used on phone if no bonjour.
 int ethernetConnected = 0;
@@ -96,13 +96,13 @@ void setup() {
   //Serial.println("Memory: Setup begin=");
   //Serial.println(freeMemory());
 
-  // Initialize all pixels/LEDS to orange
+  // Initialize all pixels/LEDS to white
   strip.begin();
   int hue = 22; //orange
   Color clr;
   ColorUtils::setHSB(clr, hue, saturation, brightness);
   for(int i = 0; i < activeLeds; i++)  {
-    //hues[i] = hue;
+    hues[i] = hue;
     strip.setPixelColor(i, clr.r, clr.g, clr.b);
   }
   strip.show(); // Initialize all pixels to 'off'
@@ -195,15 +195,17 @@ void loop() {
 
   // all the leds initialise green when connected to netwrok or red when not
   if(!hasEthernetBlinked) {
+    
+    Color clr;
+    saturation = 255; // reset saturation
     if(ethernetConnected == 1) {
 
       // all lights are green - we are connected
       //Color green = {0,255,0};
       int hue = 85; //green
-      Color clr;
       ColorUtils::setHSB(clr, hue, saturation, brightness);
       //colorWipe(clr, 50);
-      theaterChase(clr, 50);
+      //theaterChase(clr, 50);
 
       /*lerpAmount = 0.0;
       for(int i = 0; i < NUM_LEDS; i++)  {
@@ -215,16 +217,24 @@ void loop() {
       // all lights are red
       //Color red = {255,0,0};
       int hue = 0; //green
-      Color clr;
       ColorUtils::setHSB(clr, hue, saturation, brightness);
-      //colorWipe(clr, 50);
-      theaterChase(clr, 50);
+      
 
       /*lerpAmount = 0.0;
       for(int i = 0; i < NUM_LEDS; i++)  {
         hues[i] = 0;
         ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
       }*/
+    }
+    
+    //colorWipe(clr, 50);
+    theaterChase(clr, 50);
+    
+    // after inited - all leds go to default mode and go to a single colour
+    int hue = 22; // orange
+    for(int i = 0; i < activeLeds; i++)  {
+      hues[i] = hue;
+      ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
     }
     
     hasEthernetBlinked = true;
@@ -608,7 +618,10 @@ void onMicrophone(OSCMessage *_mes){
 }
 
 void onMicSamples(OSCMessage *_mes) {
+  micPos = 0;
   micReadCount = _mes->getArgInt32(0); // 0-120
+  micSum = 0;
+  micValues[micPos] = 0;
   if(micReadCount > MAX_MIC_SAMPLES) micReadCount = MAX_MIC_SAMPLES;
 #ifdef USE_SERIAL_PRINT
   Serial.print("\nMicrophone samples changed: ");
