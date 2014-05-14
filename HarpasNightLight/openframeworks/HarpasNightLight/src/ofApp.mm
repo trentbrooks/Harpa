@@ -21,10 +21,12 @@
 
 //--------------------------------------------------------------
 void ofApp::setup(){
+    
     ofSetFrameRate(30);
     ofEnableAlphaBlending();
     ofBackground(230);    
     ofSetOrientation(OF_ORIENTATION_90_LEFT);
+    ofxiOSDisableIdleTimer();
     
     
     // defaults
@@ -32,7 +34,7 @@ void ofApp::setup(){
     isMicrophoneEnabled = false;
     isSpeakerEnabled = false;
     hueAll = 30; // orange
-    brightness = defaultBrightness = 75; //255;
+    brightness = defaultBrightness = lastSavedBrightness = 75; //255;
     saturation = defaultSaturation = 255;
     hue1 = hue2 = hue3 = hue4 = hueAll;
     colourMode = 0;
@@ -134,10 +136,12 @@ void ofApp::setup(){
     hs->setTextClr(textClr);
     settings.addSlider("BRIGHTNESS", &brightness, 0, 255)->copyStyle(micSlider);
     settings.addSlider("SATURATION", &saturation, 0, 255)->copyStyle(micSlider);
-    settings.addSlider("FADE DELAY", &fadeDelayMillis, 0, 20000)->copyStyle(micSlider);
-    ofxTouchGUISlider* ls= settings.addSlider("LED COUNT", &numLeds, 0, 30);
-    ls->copyStyle(micSlider);
-    ls->setOSCAddress("/numleds");
+    ofxTouchGUISlider* fd= settings.addSlider("FADE DELAY (AUTO FADE MODE)", &fadeDelayMillis, 0, 20000);
+    fd->copyStyle(micSlider);
+    fd->setOSCAddress("/fadedelay");
+    //ofxTouchGUISlider* ls= settings.addSlider("LED COUNT", &numLeds, 0, 30);
+    //ls->copyStyle(micSlider);
+    //ls->setOSCAddress("/numleds");
     
 
 
@@ -393,6 +397,14 @@ void ofApp::onGUIChanged(ofxTouchGUIEventArgs & args) {
         //bonjour.discoverService();
         beginBonjour();
     }
+    else if( buttonLabel == "COLOUR MODE") {
+        
+        // when color mode has changed, make sure we reset saturation + brightness
+        // also send mode again!
+        settings.sendOSC("/saturation", saturation);
+        settings.sendOSC("/brightness", brightness);
+        settings.sendOSC("/mode", colourMode);
+    }
 }
 
 void ofApp::beginBonjour() {
@@ -455,53 +467,48 @@ void ofApp::onMainButtonPressed(DisplayLayerEventArgs& args) {
     if(!mainButtons[buttonId]->isUpImage) {
         animations[buttonId]->play();
         mainButtons[buttonId]->sound.play();
-
-        // if not the rainbow- set to normal mode
-        if(buttonId != 4) {
-            colourMode = 0;
-            settings.sendOSC("/mode", colourMode);
-        }
         
         // saturation + brightness for white + black
         // already sends brightness, but need to send saturation as well
         if(buttonId == 0) {
             
             // if white - send brightness 255 + saturation 0
-            brightness = defaultBrightness;//mainButtons[buttonId]->oscVal;
+            //brightness = defaultBrightness;//mainButtons[buttonId]->oscVal;
             //mainButtons[buttonId]->oscVal = brightness;
-            saturation = 0;
-            settings.sendOSC("/saturation", saturation);
+            //saturation = 0;
+            settings.sendOSC("/saturation", 0);// saturation);
             settings.sendOSC("/brightness", brightness);
         } else if(buttonId == 8) {
             
             // if black - send brightness 0+ saturation 255
-            brightness = 0;//mainButtons[buttonId]->oscVal;
-            saturation = 255;
-            settings.sendOSC("/saturation", saturation);
-            settings.sendOSC("/brightness", brightness);
+            //brightness = 0; //mainButtons[buttonId]->oscVal;
+            //saturation = 255;
+            settings.sendOSC("/saturation", 255);//saturation);
+            settings.sendOSC("/brightness", 0);//brightness);
         } else {
+            
+            // send normal osc message (hue for normal colors, brightness for white/back, mode for raindbow)
+            settings.sendOSC(mainButtons[buttonId]->oscAddress, mainButtons[buttonId]->oscVal);
             
             // if saturation is 0 or brightness is 0 when changing hue, it won;t work properly
             // eg. if last selected was white or black
             //if(saturation == 0) {
-                saturation = defaultSaturation;
+                //saturation = defaultSaturation;
                 settings.sendOSC("/saturation", saturation);
             //}
             //if(brightness == 0) {
-                brightness = defaultBrightness;
+                //brightness = defaultBrightness;
                 settings.sendOSC("/brightness", brightness);
             //}
             
-            // send normal osc message (hue for normal colors, brightness for white/back, mode for raindbow)
-            settings.sendOSC(mainButtons[buttonId]->oscAddress, mainButtons[buttonId]->oscVal);
+            // if not the rainbow- set to normal mode
+            if(buttonId != 4) {
+                colourMode = 0;
+                settings.sendOSC("/mode", colourMode);
+            }
+            
         }
-        
-        
-        
-        
-        
-        
-        
+
     } else {
         animations[buttonId]->stop();
     }

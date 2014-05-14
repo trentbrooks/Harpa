@@ -43,6 +43,8 @@
 		8f5205aef8861ef234f0651a /* ofxOscSender.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 81967292bfc87a0144bd32c6 /* ofxOscSender.cpp */; };
 		933a2227713c720ceff80fd9 /* tinyxml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2b40eda85beb63e46785bc29 /* tinyxml.cpp */; };
 		9d44dc88ef9e7991b4a09951 /* tinyxmlerror.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 832bdc407620cdba568b713d /* tinyxmlerror.cpp */; };
+		A7F1DE7A191F11A20024A5FA /* Default-Landscape~ipad.png in Resources */ = {isa = PBXBuildFile; fileRef = A7F1DE79191F11A20024A5FA /* Default-Landscape~ipad.png */; };
+		A7F1DE7C191F12610024A5FA /* Default-Portrait~ipad.png in Resources */ = {isa = PBXBuildFile; fileRef = A7F1DE7B191F12610024A5FA /* Default-Portrait~ipad.png */; };
 		A7FA21D818E3AF770089C599 /* CFNetwork.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A7FA21D718E3AF770089C599 /* CFNetwork.framework */; };
 		BB16EBD20F2B2A9500518274 /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB16EBD10F2B2A9500518274 /* OpenGLES.framework */; };
 		BB16EBD90F2B2AB500518274 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB16EBD80F2B2AB500518274 /* QuartzCore.framework */; };
@@ -156,6 +158,8 @@
 		9bf3aa0d4faa89d0f8a0e545 /* OscReceivedElements.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = OscReceivedElements.cpp; path = ../../../addons/ofxOsc/libs/oscpack/src/osc/OscReceivedElements.cpp; sourceTree = SOURCE_ROOT; };
 		9f7986dc4eb05e75fce2c777 /* ofxOscSender.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ofxOscSender.h; path = ../../../addons/ofxOsc/src/ofxOscSender.h; sourceTree = SOURCE_ROOT; };
 		9fba6567ccc25994b3915a4d /* ResourceManager.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = ResourceManager.h; path = ../../../addons/ofxUtils/src/ResourceManager.h; sourceTree = SOURCE_ROOT; };
+		A7F1DE79191F11A20024A5FA /* Default-Landscape~ipad.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-Landscape~ipad.png"; sourceTree = "<group>"; };
+		A7F1DE7B191F12610024A5FA /* Default-Portrait~ipad.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-Portrait~ipad.png"; sourceTree = "<group>"; };
 		A7FA21D718E3AF770089C599 /* CFNetwork.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CFNetwork.framework; path = System/Library/Frameworks/CFNetwork.framework; sourceTree = SDKROOT; };
 		BB16EBD10F2B2A9500518274 /* OpenGLES.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGLES.framework; path = System/Library/Frameworks/OpenGLES.framework; sourceTree = SDKROOT; };
 		BB16EBD80F2B2AB500518274 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
@@ -306,6 +310,8 @@
 				678E130B1795153C005B6D19 /* Default.png */,
 				678E130D17951540005B6D19 /* Default@2x.png */,
 				678E130F17951549005B6D19 /* Default-568h@2x~iphone.png */,
+				A7F1DE79191F11A20024A5FA /* Default-Landscape~ipad.png */,
+				A7F1DE7B191F12610024A5FA /* Default-Portrait~ipad.png */,
 				E4D8936A11527B74007E1F53 /* src */,
 				BB24E1F710DAA51900E9C588 /* openFrameworks */,
 				BB16F26B0F2B646B00518274 /* addons */,
@@ -670,7 +676,9 @@
 				678E130817951530005B6D19 /* Icon@2x.png in Resources */,
 				678E130A17951536005B6D19 /* Icon.png in Resources */,
 				678E130C1795153C005B6D19 /* Default.png in Resources */,
+				A7F1DE7C191F12610024A5FA /* Default-Portrait~ipad.png in Resources */,
 				678E130E17951540005B6D19 /* Default@2x.png in Resources */,
+				A7F1DE7A191F11A20024A5FA /* Default-Landscape~ipad.png in Resources */,
 				678E131017951549005B6D19 /* Default-568h@2x~iphone.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

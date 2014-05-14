@@ -73,6 +73,7 @@ class ofApp : public ofxiOSApp {
     bool isSpeakerEnabled;
     int hueAll;
     int brightness, defaultBrightness;
+    int lastSavedBrightness;
     int saturation, defaultSaturation;
     int hue1, hue2, hue3, hue4;
     int colourMode;
