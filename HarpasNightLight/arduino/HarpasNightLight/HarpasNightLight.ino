@@ -28,8 +28,11 @@
 
 // TIMER
 Timer timer; // used to replace standard loop
-int8_t normalTimerId;
-int8_t speakerTimerId;
+int8_t normalTimerId=-1;
+int8_t speakerTimerId=-1;
+int8_t switchOffTimerId=-1;
+unsigned long killAfterHours =  43200000;//1000*60*60*12; 28800000;//1000*60*60*8;
+unsigned long sleepAfterHours = 43200000;//1000*60*60*12; 57600000;//1000*60*60*16;
 
 // MICROPHONE: reads mic level, compares against average. once loud enough sounds
 // detected - it waits a certain amount (eg. 15 seconds) of time before resetting.
@@ -64,12 +67,13 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ
 Color currentLedRGB[NUM_LEDS];
 Color newLedRGB[NUM_LEDS];
 int hues[NUM_LEDS];
+int latestHue = 22;
 int brightness = 75; //255;
 int saturation = 0;
 int activeLeds = NUM_LEDS;
-float lerpInc = 0.0025;//025;//5;
+float lerpInc = 0.025;//0025;//025;//5;
 float lerpAmount = 0;
-int fadeDelayTime=5000;
+int fadeDelayTime= 25000;//5000;
 long previousMillis = 0;
 uint16_t rainbowCycleIndex = 0;
 int mode = 0; // 0 = normal/manual, 1 = auto fade/change, 2 = rainbow, 3 = sound reactive/mic
@@ -99,6 +103,7 @@ void setup() {
   // Initialize all pixels/LEDS to white
   strip.begin();
   int hue = 22; //orange
+  latestHue = hue;
   Color clr;
   ColorUtils::setHSB(clr, hue, saturation, brightness);
   for(int i = 0; i < activeLeds; i++)  {
@@ -183,7 +188,10 @@ void setup() {
   // timers
   normalTimerId = timer.every(20, onTimerUpdate, 0); // normal update loop
   speakerTimerId = timer.every(noiseFrequencyDelay, onTimerSpeaker, 0); // speaker needs seperate loop
-
+  startOffTimer(); 
+  //switchOffTimerId = timer.after(killAfterHours, switchLedsOff, 0); // kill everything after X hours
+  
+  //Serial.println(killAfterHours);
   //Serial.println("Memory: Setup complete=");
   //Serial.println(freeMemory());
 #ifdef USE_SERIAL_PRINT
@@ -216,7 +224,7 @@ void loop() {
 
       // all lights are red
       //Color red = {255,0,0};
-      int hue = 0; //green
+      int hue = 0; //red
       ColorUtils::setHSB(clr, hue, saturation, brightness);
       
 
@@ -232,10 +240,13 @@ void loop() {
     
     // after inited - all leds go to default mode and go to a single colour
     int hue = 22; // orange
+    latestHue = hue;
     for(int i = 0; i < activeLeds; i++)  {
       hues[i] = hue;
       ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
     }
+    //Serial.print("\nShould be orange now");
+    //strip.show(); 
     
     hasEthernetBlinked = true;
   }
@@ -258,6 +269,7 @@ void loop() {
   // 1. updateLeds()
   // 2. updateMic()
   // 3. updateSpeaker() (custom timer)
+  //Serial.print("\nDa fuq?");
   timer.update();
 }
 
@@ -316,6 +328,10 @@ void updateMic() {
     // 2) sound could change the colour of the leds instead of turning led on/off
     //if(!soundChanged) {
       if(diff > differenceScale) {
+        /*#ifdef USE_SERIAL_PRINT
+        Serial.print("\nSound changed: ");
+        Serial.print(diff);
+        #endif*/
         soundChanged = true;
         lerpAmount = 0;
         int randomHue = random(0,255);
@@ -343,7 +359,7 @@ int getRollingAverage(int v) {
   micSum += v;
   micValues[micPos] = v;
   //micPos = (micPos + 1) % micReadCount;
-  if (++micPos == micReadCount) micPos = 0;
+  if (++micPos >= micReadCount) micPos = 0;
   return micSum / micReadCount;
 }
 
@@ -381,7 +397,11 @@ void generateNoise(){
 // update individual leds
 void updateLeds() {
 
-  if(lerpAmount < 1) lerpAmount += lerpInc;
+  if(lerpAmount < 1) {
+    lerpAmount += lerpInc;
+  } else {
+    lerpAmount = 1;
+  }
 
   for(int i = 0; i < NUM_LEDS; i++)  {
     ColorUtils::lerpRGB(currentLedRGB[i], newLedRGB[i], lerpAmount);
@@ -389,6 +409,11 @@ void updateLeds() {
     strip.setPixelColor(i, currentLedRGB[i].r,currentLedRGB[i].g,currentLedRGB[i].b);
   }
   strip.show();
+  
+  /*#ifdef USE_SERIAL_PRINT
+  Serial.print("\nLEDs updated: ");
+  Serial.print(lerpAmount);
+  #endif*/
 
 }
 
@@ -528,21 +553,25 @@ void wheel(Color& clr, byte WheelPos) {
 // ifdef not working here
 #ifdef USE_OSC
 void onHue(OSCMessage *_mes){
-  int hue = _mes->getArgInt32(0);
+  int oscVal = _mes->getArgInt32(0);
+  if(oscVal == latestHue) return;
+  latestHue = oscVal;
   //ColorUtils::setHSB(newRGB, hue, saturation, brightness);
   for(int i = 0; i < activeLeds; i++)  {
-    hues[i] = hue;
+    hues[i] = latestHue;
     ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
   }
 #ifdef USE_SERIAL_PRINT
   Serial.print("\nHues changed: ");
-  Serial.print(hue);
+  Serial.print(latestHue);
 #endif
 }
 
 
 void onBrightness(OSCMessage *_mes){
-  brightness = _mes->getArgInt32(0);
+  int oscVal = _mes->getArgInt32(0);
+  if(oscVal == brightness) return;
+  brightness = oscVal;
   //ColorUtils::setHSB(newRGB, hue, saturation, brightness);
   for(int i = 0; i < activeLeds; i++)  {
     ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
@@ -551,10 +580,21 @@ void onBrightness(OSCMessage *_mes){
   Serial.print("\nBrightness changed: ");
   Serial.print(brightness);
 #endif
+
+  // reset the timers
+  if(brightness == 0) {
+    // when we send 'black' (ie. off) reset the ON timer
+    startOnTimer();
+  } else {
+    // when we send and other value reset the OFF timer
+    startOffTimer();
+  }
 }
 
 void onSaturation(OSCMessage *_mes){
-  saturation = _mes->getArgInt32(0);
+  int oscVal = _mes->getArgInt32(0);
+  if(oscVal == saturation) return;
+  saturation = oscVal;
   //ColorUtils::setHSB(newRGB, hue, saturation, brightness);
   for(int i = 0; i < activeLeds; i++)  {
     ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
@@ -591,10 +631,12 @@ void onFadeDelay(OSCMessage *_mes) {
   
 
 void onMode(OSCMessage *_mes){
-  mode = _mes->getArgInt32(0);
+  int oscVal = _mes->getArgInt32(0);
+  if(oscVal == mode) return;
+  mode = oscVal;
   if(mode == 3) {
     useMic = true;
-    int hue = 220; // everything goes pink
+    int hue = 220; // everything goes pink - fade mode
     //ColorUtils::setHSB(newRGB, hue, saturation, brightness);
     for(int i = 0; i < activeLeds; i++)  {
       hues[i] = hue;
@@ -707,4 +749,66 @@ void onLeds(OSCMessage *_mes) {
 
 #endif
 
+// POWER OFF
+void switchLedsOff(void *context) {
+  
+  //Serial.println("Finished!");
+  
+  // 1. switch all lights off- to black
+  saturation = 0;
+  brightness = 0;
+  for(int i = 0; i < NUM_LEDS; i++)  {
+      hues[i] = 0;
+      ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
+      ColorUtils::setHSB(currentLedRGB[i], hues[i], saturation, brightness);
+  }
+  
+  // 4. start kill timer again
+  startOffTimer();
+  
+  // 2. stay off for the next X hours
+  /*delay(sleepAfterHours); 
+  
+  // 3. turn LEDS back on to default orange
+  brightness = 75; //255;
+  saturation = 0;
+  int hue = 22; // orange
+  for(int i = 0; i < NUM_LEDS; i++)  {
+      hues[i] = hue;
+      ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
+  }
+  
+  // 4. start kill timer again
+  switchOffTimerId = timer.after(killAfterHours, switchLedsOff, 0); // kill everything after X hours
+  */
+}
+
+// 1. this turns the LEDS OFF after X hours. This should launch on startup.
+void startOffTimer() {
+  timer.stop(switchOffTimerId);
+  switchOffTimerId = timer.after(killAfterHours, switchLedsOff, 0);
+}
+
+// 2. waits for X hours then turns the LEDS ON. Assumes everything is already off.
+void startOnTimer() {
+  timer.stop(switchOffTimerId);
+  switchOffTimerId = timer.after(sleepAfterHours, switchLedsOn, 0); // kill everything after X hours
+}
+
+
+
+
+// POWER ON
+void switchLedsOn(void *context) {
+  brightness = 75; //255;
+  saturation = 0;
+  int hue = 22; // orange
+  for(int i = 0; i < NUM_LEDS; i++)  {
+      hues[i] = hue;
+      ColorUtils::setHSB(newLedRGB[i], hues[i], saturation, brightness);
+  }
+  
+  startOnTimer();
+  
+}
 
